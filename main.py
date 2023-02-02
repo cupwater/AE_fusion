@@ -37,9 +37,9 @@ def main(config_file):
 
     data_config = config['dataset']
     transform_train = TrainTransform(
-        crop_size=data_config['crop_size'], img_size=data_config['final_size'])
+        crop_size=data_config['crop_size'], final_size=data_config['final_size'])
     transform_test = TestTransform(
-        crop_size=data_config['crop_size'], img_size=data_config['final_size'])
+        crop_size=data_config['crop_size'], final_size=data_config['final_size'])
 
     print('==> Preparing dataset %s' % data_config['type'])
 
@@ -114,7 +114,7 @@ def train(trainloader, model, criterion, optimizer, use_cuda):
         if use_cuda:
             rgb_input, ir_input = rgb_input.cuda(), ir_input.cuda()
         rgb_input = torch.autograd.Variable(rgb_input)
-        targets = torch.autograd.Variable(targets)
+        tarir_inputgets = torch.autograd.Variable(ir_input)
         out_vis, vis_feat_bg, vis_feat_detail, out_ir, \
                 ir_feat_bg, ir_feat_detail = model(rgb_input, ir_input) 
 

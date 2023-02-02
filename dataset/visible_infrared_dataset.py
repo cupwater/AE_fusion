@@ -1,7 +1,7 @@
 '''
 Author: Pengbo
 Date: 2022-02-23 15:42:01
-LastEditTime: 2023-02-02 11:09:50
+LastEditTime: 2023-02-02 11:24:26
 Description: 
 
 '''
@@ -29,19 +29,15 @@ class VisibleInfraredPairDataset (Dataset):
         p1, p2 = self.imgs_list[index].strip().split(',')
         rgb_path, ir_path = os.path.join(self.prefix, p1.strip()), os.path.join(self.prefix, p2.strip())
 
-        rgb = cv2.imread(rgb_path, cv2.IMREAD_GRAYSCALE)
+        rgb = cv2.imread(rgb_path)
         ir  = cv2.imread(ir_path, cv2.IMREAD_GRAYSCALE)
-
         if self.transform != None:
-            concat_img = cv2.merge((rgb, rgb, ir))
-            concat_img = self.transform(image=concat_img)['image']
-            rgb, _, ir = cv2.split(concat_img)
-
-        rgb = cv2.cvtColor(rgb, cv2.COLOR_GRAY2RGB).transpose((2,0,1))
-        ir  = cv2.cvtColor(ir, cv2.COLOR_GRAY2RGB).transpose((2,0,1))
-
+            result = self.transform(image=rgb, mask=ir)
+            rgb, ir = result['image'], result['mask']
+        rgb = rgb.transpose((2,0,1))
+        ir  = np.expand_dims(ir, axis=2).transpose((2,0,1))
         rgb, ir = torch.FloatTensor(rgb), torch.FloatTensor(ir)
-        return rgb, ir
+        return rgb[0:1,:,:], ir
 
     def __len__(self):
         return len(self.imgs_list)
