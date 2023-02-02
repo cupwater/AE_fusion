@@ -1,4 +1,6 @@
 __pycache__
+experiments
+.*
 Datasets
 *.pyc
 *.png

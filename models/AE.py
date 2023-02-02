@@ -1,9 +1,17 @@
+'''
+Author: Peng Bo
+Date: 2023-02-02 08:25:04
+LastEditTime: 2023-02-02 08:38:32
+Description: 
+
+'''
 # coding: utf8
 
-import torch
 from torch import nn
 from .encoder import Encoder
 from .decoder import Decoder
+
+__all__ = ["AutoEncoder"]
 
 class AutoEncoder(nn.Module):
     def __init__(self, fuse_mode='Sum'):

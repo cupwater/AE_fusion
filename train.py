@@ -56,7 +56,7 @@ scheduler = MultiStepLR(optimizer, [epochs//3, epochs//3*2], gamma=0.1)
 MSELoss = nn.MSELoss()
 SmoothL1Loss = nn.SmoothL1Loss()
 L1Loss = nn.L1Loss()
-ssim = kornia.losses.SSIM(11, reduction='mean')
+ssim = kornia.losses.SSIMLoss(11, reduction='mean')
 import matplotlib.pyplot as plt
 
 # Training
