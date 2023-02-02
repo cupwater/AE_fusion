@@ -19,11 +19,11 @@ from augmentation.augment import TrainTransform, TestTransform
 from utils import Logger, AverageMeter, mkdir_p, progress_bar
 
 state = {}
-best_anchor = 999
+best_loss = 999
 use_cuda = True
 
 def main(config_file):
-    global state, best_acc, use_cuda
+    global state, best_loss, use_cuda
 
     # parse config of model training
     with open(config_file) as f:
@@ -55,7 +55,7 @@ def main(config_file):
     trainloader = torch.utils.data.DataLoader(
         trainset, batch_size=common_config['train_batch'], shuffle=True, num_workers=5)
     testloader = torch.utils.data.DataLoader(
-        testset, batch_size=common_config['train_batch'], shuffle=False, num_workers=5)
+        testset, batch_size=common_config['test_batch'], shuffle=False, num_workers=5)
 
     # Model
     print("==> creating model '{}'".format(common_config['arch']))
@@ -93,11 +93,11 @@ def main(config_file):
         train_loss = train(trainloader, model, criterion_list, optimizer, use_cuda)
         # append logger file
         logger.append([state['lr'], train_loss, train_loss])
-        best_anchor = min(train_loss, best_anchor)
+        best_loss = min(train_loss, best_loss)
         save_checkpoint({
             'epoch': epoch + 1,
             'state_dict': model.state_dict(),
-        }, train_loss < best_anchor, save_path=common_config['save_path'])
+        }, train_loss < best_loss, save_path=common_config['save_path'])
 
     test(testloader, model, criterion_list, use_cuda)
     logger.close()
@@ -150,7 +150,7 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda):
 
 
 def test(testloader, model, criterion, use_cuda):
-    global best_anchor
+    global best_loss
     # switch to evaluate mode
     model.eval()
     batch_time = AverageMeter()

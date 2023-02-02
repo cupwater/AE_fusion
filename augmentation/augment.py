@@ -19,8 +19,8 @@ def TrainTransform(final_size=256, crop_size=224):
 
 def TestTransform(final_size=256, crop_size=224):
     return A.Compose([
-        A.Resize(final_size, final_size),
-        A.CenterCrop(width=crop_size, height=crop_size),
+        #A.Resize(final_size, final_size),
+        #A.CenterCrop(width=crop_size, height=crop_size),
         #A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
     ])
 
