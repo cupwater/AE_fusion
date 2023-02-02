@@ -53,21 +53,21 @@ def main(config_file):
     trainset = dataset.__dict__[data_config['type']](
         data_config['train_list'], transform_train, 
         prefix=data_config['prefix'])
-    testset = dataset.__dict__[data_config['type']](
-        data_config['test_list'], transform_test, 
-        prefix=data_config['prefix'])
+    # testset = dataset.__dict__[data_config['type']](
+    #     data_config['test_list'], transform_test, 
+    #     prefix=data_config['prefix'])
 
     # create dataloader for training and testing
-    trainloader = torch.util.data.DataLoader(
+    trainloader = torch.utils.data.DataLoader(
         trainset, batch_size=common_config['train_batch'], shuffle=True, num_workers=5)
-    testloader = torch.util.data.DataLoader(
-        testset, batch_size=common_config['train_batch'], shuffle=False, num_workers=5)
+    # testloader = torch.utils.data.DataLoader(
+    #     testset, batch_size=common_config['train_batch'], shuffle=False, num_workers=5)
 
     # Model
     print("==> creating model '{}'".format(common_config['arch']))
     model = models.__dict__[common_config['arch']]()
-    model.load_state_dict(torch.load(common_config['pretrained_weights'])[
-                          'state_dict'], strict=False)
+    # model.load_state_dict(torch.load(common_config['pretrained_weights'])[
+    #                       'state_dict'], strict=False)
     if use_cuda:
         model = model.cuda()
     torch.backends.cudnn.benchmark = True
@@ -91,16 +91,16 @@ def main(config_file):
         adjust_learning_rate(optimizer, epoch, common_config)
         print('\nEpoch: [%d | %d] LR: %f' % (epoch + 1, common_config['epoch'], state['lr']))
         train_loss = train(trainloader, model, criterion, optimizer, use_cuda)
-        test_loss  = test(testloader, model, criterion, use_cuda)
-        # append logger file
-        logger.append([state['lr'], train_loss, test_loss])
-        # save model
-        best_anchor = max(test_loss, best_anchor)
-        save_checkpoint({
-            'epoch': epoch + 1,
-            'state_dict': model.state_dict(),
-            'loss': test_loss,
-        }, test_loss > best_anchor, save_path=common_config['save_path'])
+        # test_loss  = test(testloader, model, criterion, use_cuda)
+        # # append logger file
+        # logger.append([state['lr'], train_loss, test_loss])
+        # # save model
+        # best_anchor = max(test_loss, best_anchor)
+        # save_checkpoint({
+        #     'epoch': epoch + 1,
+        #     'state_dict': model.state_dict(),
+        #     'loss': test_loss,
+        # }, test_loss > best_anchor, save_path=common_config['save_path'])
 
     logger.close()
 
@@ -114,25 +114,23 @@ def train(trainloader, model, criterion, optimizer, use_cuda):
     losses     = AverageMeter()
     end        = time.time()
 
-    for batch_idx, (data_package) in enumerate(trainloader):
+    for batch_idx, (rgb_input, ir_input) in enumerate(trainloader):
         # measure data loading time
         data_time.update(time.time() - end)
-        inputs, targets = data_package
         if use_cuda:
-            inputs, targets = inputs.cuda(), targets.cuda()
-        inputs = torch.autograd.Variable(inputs)
+            rgb_input, ir_input = rgb_input.cuda(), ir_input.cuda()
+        rgb_input = torch.autograd.Variable(rgb_input)
         targets = torch.autograd.Variable(targets)
-            
-        outputs = model(inputs)
-        outputs, targets = outputs.view(outputs.size(0), -1), targets.view(targets.size(0), -1)
+        out_vis, vis_feat_bg, vis_feat_detail, out_ir, \
+                ir_feat_bg, ir_feat_detail = model(rgb_input, ir_input) 
 
-        loss = criterion(outputs, targets)
-        losses.update(loss.item(), inputs.size(0))
+        #loss = criterion(outputs, targets)
+        #losses.update(loss.item(), inputs.size(0))
         # compute gradient and do SGD step
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        progress_bar(batch_idx, len(trainloader), 'Loss: %.2f ' % (losses.avg))
+        #optimizer.zero_grad()
+        #loss.backward()
+        #optimizer.step()
+        #progress_bar(batch_idx, len(trainloader), 'Loss: %.2f ' % (losses.avg))
 
         # measure elapsed time
         batch_time.update(time.time() - end)
