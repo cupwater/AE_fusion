@@ -10,12 +10,12 @@ import shutil
 import time
 import yaml
 import torch
-from torchvision import transforms
-from augmentation.augment import TrainTransform, TestTransform
+from skimage.io import imsave
 
 import models
 import dataset
 import losses
+from augmentation.augment import TrainTransform, TestTransform
 from utils import Logger, AverageMeter, mkdir_p, progress_bar
 
 state = {}
@@ -90,18 +90,16 @@ def main(config_file):
     for epoch in range(common_config['epoch']):
         adjust_learning_rate(optimizer, epoch, common_config)
         print('\nEpoch: [%d | %d] LR: %f' % (epoch + 1, common_config['epoch'], state['lr']))
-        train(trainloader, model, criterion_list, optimizer, use_cuda)
-        # test_loss  = test(testloader, model, criterion_list, use_cuda)
-        # # append logger file
-        # logger.append([state['lr'], train_loss, test_loss])
-        # # save model
-        # best_anchor = max(test_loss, best_anchor)
-        # save_checkpoint({
-        #     'epoch': epoch + 1,
-        #     'state_dict': model.state_dict(),
-        #     'loss': test_loss,
-        # }, test_loss > best_anchor, save_path=common_config['save_path'])
+        train_loss = train(trainloader, model, criterion_list, optimizer, use_cuda)
+        # append logger file
+        logger.append([state['lr'], train_loss, train_loss])
+        best_anchor = min(train_loss, best_anchor)
+        save_checkpoint({
+            'epoch': epoch + 1,
+            'state_dict': model.state_dict(),
+        }, train_loss < best_anchor, save_path=common_config['save_path'])
 
+    test(testloader, model, criterion_list, use_cuda)
     logger.close()
 
 
@@ -144,13 +142,10 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda):
         optimizer.zero_grad()
         all_loss.backward()
         optimizer.step()
-        print(all_loss.item())
-        #progress_bar(batch_idx, len(trainloader), 'Loss: %.2f ' % (losses.avg))
-
+        progress_bar(batch_idx, len(trainloader), 'Loss: %.2f ' % (losses.avg))
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
-
     return (losses.avg)
 
 
@@ -161,27 +156,26 @@ def test(testloader, model, criterion, use_cuda):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
-
     end = time.time()
-    for batch_idx, (inputs, targets) in enumerate(testloader):
+
+    model.eval()
+    for batch_idx, (vis_input, ir_input) in enumerate(testloader):
         # measure data loading time
         data_time.update(time.time() - end)
-
         if use_cuda:
-            inputs, targets = inputs.cuda(), targets.cuda()
-        inputs, targets = torch.autograd.Variable(
-            inputs, volatile=True), torch.autograd.Variable(targets)
-        # compute output
-        outputs = model(inputs)
-        outputs, targets = outputs.view(outputs.size(0), -1), targets.view(targets.size(0), -1)
-        loss = criterion(outputs, targets)
-        losses.update(loss.item(), inputs.size(0))
+            vis_input, ir_input = vis_input.cuda(), ir_input.cuda()
+        vis_input = torch.autograd.Variable(vis_input)
+        ir_input  = torch.autograd.Variable(ir_input)
 
-        progress_bar(batch_idx, len(testloader), 'Loss: %.2f' % (losses.avg))
+        fuse_out = model(vis_input, ir_input).cpu().detach().numpy()
+        for idx in range(fuse_out.shape[0]):
+            img = fuse_out[idx,0]
+            imsave(f"data/test_results/{batch_idx}_{idx}.jpg", img)
+
+        progress_bar(batch_idx, len(testloader))
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
-
     return (losses.avg)
 
 
