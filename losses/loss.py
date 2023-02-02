@@ -2,17 +2,24 @@
 '''
 Author: Pengbo
 Date: 2022-02-23 16:17:31
-LastEditTime: 2023-02-02 09:56:33
+LastEditTime: 2023-02-02 16:15:24
 Description: loss function
 
 '''
 import torch
-from torch.nn import Module
 from torch import nn
 from torch.nn import functional as F
+import kornia
 
-__all__ = ['BCELoss', 'BCEFocalLoss', 'FocalLoss']
 
+__all__ = ['L1Loss', 'MS_SSIMLoss', 'BCELoss', 'BCEFocalLoss', 'FocalLoss']
+
+class L1Loss(nn.Module):
+    def __init__(self):
+        super(L1Loss, self).__init__()
+
+    def forward(self, input, target):
+        return F.l1_loss(input, target, reduction='mean')
 
 class BCELoss(nn.Module):
     def __init__(self):
@@ -30,7 +37,6 @@ class BCELoss(nn.Module):
             loss = loss.sum()
         return loss
 
-
 class BCEFocalLoss(nn.Module):
     def __init__(self, alpha=0.6, gamma=0.2, num_classes = 2):
         super(BCEFocalLoss, self).__init__()
@@ -45,7 +51,6 @@ class BCEFocalLoss(nn.Module):
         loss = - alpha * (1 - logits) ** gamma * target * torch.log(logits) - \
                (1 - alpha) * logits ** gamma * (1 - target) * torch.log(1 - logits)
         return loss.mean()
-
 
 class FocalLoss(nn.Module):
     def __init__(self, alpha=0.25, gamma=2, num_classes = 2, size_average=True):
@@ -91,3 +96,12 @@ class FocalLoss(nn.Module):
         else:
             loss = loss.sum()
         return loss
+
+
+class MS_SSIMLoss(nn.Module):
+    def __init__(self, window_size=11, max_val=1.0):
+        self.ssim = kornia.losses.SSIMLoss(window_size=window_size, max_val=max_val, reduction='mean')
+        self.mse = nn.MSELoss()
+
+    def forward(self, img1, img2):
+        return self.ssim(img1, img2) + self.mse(img1, img2)
