@@ -37,6 +37,7 @@ class VisibleInfraredPairDataset (Dataset):
         rgb = rgb.transpose((2,0,1))
         ir  = np.expand_dims(ir, axis=2).transpose((2,0,1))
         rgb, ir = torch.FloatTensor(rgb), torch.FloatTensor(ir)
+        rgb, ir = rgb / 255.0, ir / 255.0
         return rgb[0:1,:,:], ir
 
     def __len__(self):

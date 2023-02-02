@@ -12,7 +12,7 @@ import os
 import scipy.io as scio
 import kornia
 
-from model.AE import AutoEncoder
+from models.AE import AutoEncoder
 
 is_cuda = False
 Train_data_choose = 'FLIR'  # 'FLIR' & 'NIR'

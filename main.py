@@ -114,6 +114,7 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda):
     losses     = AverageMeter()
     end        = time.time()
 
+    model.train()
     for batch_idx, (vis_input, ir_input) in enumerate(trainloader):
         # measure data loading time
         data_time.update(time.time() - end)
@@ -127,15 +128,15 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda):
         all_loss = 0
         for loss_fun, weight, loss_key in criterion_list:
             if loss_key   == 'bg_dif':
-                all_loss  += weight * loss_fun(ir_feat_bg, vis_feat_bg)
+                all_loss  += weight * torch.tanh(loss_fun(ir_feat_bg, vis_feat_bg))
             elif loss_key == 'detail_dif':
-                all_loss  += weight * loss_fun(ir_feat_detail, vis_feat_detail)
-            # elif loss_key == 'vis_rec':
-            #     all_loss  += weight * loss_fun(out_vis, vis_input)
-            # elif loss_key == 'ir_rec':
-            #     all_loss  += weight * loss_fun(out_ir, ir_input)
-            # elif loss_key == 'vis_gradient':
-            #     all_loss  += weight * loss_fun(vis_input, out_vis)
+                all_loss  += weight * torch.tanh(loss_fun(ir_feat_detail, vis_feat_detail))
+            elif loss_key == 'vis_rec':
+                all_loss  += weight * loss_fun(out_vis, vis_input)
+            elif loss_key == 'ir_rec':
+                all_loss  += weight * loss_fun(out_ir, ir_input)
+            elif loss_key == 'vis_gradient':
+                all_loss  += weight * loss_fun(vis_input, out_vis)
             else:
                 print("error, no such loss")
         losses.update(all_loss.item(), vis_input.size(0))
@@ -143,7 +144,8 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda):
         optimizer.zero_grad()
         all_loss.backward()
         optimizer.step()
-        progress_bar(batch_idx, len(trainloader), 'Loss: %.2f ' % (losses.avg))
+        print(all_loss.item())
+        #progress_bar(batch_idx, len(trainloader), 'Loss: %.2f ' % (losses.avg))
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -152,35 +154,35 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda):
     return (losses.avg)
 
 
-# def test(testloader, model, criterion, use_cuda):
-#     global best_anchor
-#     # switch to evaluate mode
-#     model.eval()
-#     batch_time = AverageMeter()
-#     data_time = AverageMeter()
-#     losses = AverageMeter()
+def test(testloader, model, criterion, use_cuda):
+    global best_anchor
+    # switch to evaluate mode
+    model.eval()
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    losses = AverageMeter()
 
-#     end = time.time()
-#     for batch_idx, (inputs, targets) in enumerate(testloader):
-#         # measure data loading time
-#         data_time.update(time.time() - end)
+    end = time.time()
+    for batch_idx, (inputs, targets) in enumerate(testloader):
+        # measure data loading time
+        data_time.update(time.time() - end)
 
-#         if use_cuda:
-#             inputs, targets = inputs.cuda(), targets.cuda()
-#         inputs, targets = torch.autograd.Variable(
-#             inputs, volatile=True), torch.autograd.Variable(targets)
-#         # compute output
-#         outputs = model(inputs)
-#         outputs, targets = outputs.view(outputs.size(0), -1), targets.view(targets.size(0), -1)
-#         loss = criterion(outputs, targets)
-#         losses.update(loss.item(), inputs.size(0))
+        if use_cuda:
+            inputs, targets = inputs.cuda(), targets.cuda()
+        inputs, targets = torch.autograd.Variable(
+            inputs, volatile=True), torch.autograd.Variable(targets)
+        # compute output
+        outputs = model(inputs)
+        outputs, targets = outputs.view(outputs.size(0), -1), targets.view(targets.size(0), -1)
+        loss = criterion(outputs, targets)
+        losses.update(loss.item(), inputs.size(0))
 
-#         progress_bar(batch_idx, len(testloader), 'Loss: %.2f' % (losses.avg))
-#         # measure elapsed time
-#         batch_time.update(time.time() - end)
-#         end = time.time()
+        progress_bar(batch_idx, len(testloader), 'Loss: %.2f' % (losses.avg))
+        # measure elapsed time
+        batch_time.update(time.time() - end)
+        end = time.time()
 
-#     return (losses.avg)
+    return (losses.avg)
 
 
 def save_checkpoint(state, is_best, save_path, filename='checkpoint.pth.tar'):

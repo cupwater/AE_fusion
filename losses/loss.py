@@ -12,7 +12,7 @@ from torch.nn import functional as F
 import kornia
 
 
-__all__ = ['L1Loss', 'MS_SSIMLoss', 'BCELoss', 'BCEFocalLoss', 'FocalLoss']
+__all__ = ['L1Loss', 'MS_SSIMLoss', 'GradientL1Loss', 'BCELoss', 'BCEFocalLoss', 'FocalLoss']
 
 class L1Loss(nn.Module):
     def __init__(self):
@@ -100,8 +100,18 @@ class FocalLoss(nn.Module):
 
 class MS_SSIMLoss(nn.Module):
     def __init__(self, window_size=11, max_val=1.0):
+        super(MS_SSIMLoss, self).__init__()
         self.ssim = kornia.losses.SSIMLoss(window_size=window_size, max_val=max_val, reduction='mean')
         self.mse = nn.MSELoss()
 
     def forward(self, img1, img2):
         return self.ssim(img1, img2) + self.mse(img1, img2)
+    
+class GradientL1Loss(nn.Module):
+    def __init__(self, window_size=11, max_val=1.0):
+        super(GradientL1Loss, self).__init__()
+        self.gradient_fun = kornia.filters.SpatialGradient()
+        self.l1loss = L1Loss()
+
+    def forward(self, img1, img2):
+        return self.l1loss( self.gradient_fun(img1), self.gradient_fun(img2) )
