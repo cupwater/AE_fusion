@@ -11,6 +11,7 @@ import time
 import yaml
 import torch
 from torchvision import transforms
+from augmentation.augment import TrainTransform, TestTransform
 
 import models
 import dataset
@@ -35,17 +36,10 @@ def main(config_file):
     use_cuda = torch.cuda.is_available()
 
     data_config = config['dataset']
-    # Dataset and Dataloader
-    transform_train = transforms.Compose([
-        transforms.RandomCrop(data_config['crop_size']),
-        transforms.Resize(data_config['final_size']),
-        transforms.ToTensor(),
-    ])
-    transform_test = transforms.Compose([
-        transforms.CenterCrop(data_config['crop_size']),
-        transforms.Resize(data_config['final_size']),
-        transforms.ToTensor(),
-    ])
+    transform_train = TrainTransform(
+        crop_size=data_config['crop_size'], img_size=data_config['final_size'])
+    transform_test = TestTransform(
+        crop_size=data_config['crop_size'], img_size=data_config['final_size'])
 
     print('==> Preparing dataset %s' % data_config['type'])
 

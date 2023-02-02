@@ -1,16 +1,16 @@
 '''
 Author: Pengbo
 Date: 2022-02-23 15:42:01
-LastEditTime: 2023-02-02 10:30:58
+LastEditTime: 2023-02-02 11:09:50
 Description: 
 
 '''
 import os
 import cv2
-from PIL import Image
 import torch
 import pdb
 import numpy as np
+from PIL import Image
 from torch.utils.data import Dataset
 
 __all__ = ['VisibleInfraredPairDataset']
@@ -32,13 +32,14 @@ class VisibleInfraredPairDataset (Dataset):
         rgb = cv2.imread(rgb_path, cv2.IMREAD_GRAYSCALE)
         ir  = cv2.imread(ir_path, cv2.IMREAD_GRAYSCALE)
 
-        concat_img = cv2.merge([rgb, rgb, ir]).astype(np.float32)
         if self.transform != None:
-            pdb.set_trace()
-            rgb = self.transform(rgb)
-            ir  = self.transform(ir)
+            concat_img = cv2.merge((rgb, rgb, ir))
+            concat_img = self.transform(image=concat_img)['image']
+            rgb, _, ir = cv2.split(concat_img)
 
-        rgb, ir = rgb.transpose((2, 0, 1)), ir.transpose((2, 0, 1))
+        rgb = cv2.cvtColor(rgb, cv2.COLOR_GRAY2RGB).transpose((2,0,1))
+        ir  = cv2.cvtColor(ir, cv2.COLOR_GRAY2RGB).transpose((2,0,1))
+
         rgb, ir = torch.FloatTensor(rgb), torch.FloatTensor(ir)
         return rgb, ir
 
@@ -47,13 +48,28 @@ class VisibleInfraredPairDataset (Dataset):
 
 
 if __name__ == "__main__":
-    from torchvision import transforms
-    transform_train = transforms.Compose([
-        transforms.RandomCrop(128),
-        transforms.Resize(128),
-        transforms.ToTensor(),
-    ])
-    trainset = VisibleInfraredPairDataset('data/train_list.txt', transform_train, 
-        prefix="data/train_vis_ir_images")
+    import albumentations as A
+
+    def TrainTransform(final_size=256, crop_size=224):
+        return A.Compose([
+            A.Resize(final_size, final_size),
+            A.ShiftScaleRotate(shift_limit=0.02, scale_limit=0.05, rotate_limit=15),
+            A.RandomCrop(width=crop_size, height=crop_size),
+            A.HorizontalFlip(p=0.5),
+            A.RandomBrightnessContrast(p=0.2),
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+        ])
+
+    def TestTransform(final_size=256, crop_size=224):
+        return A.Compose([
+            A.Resize(final_size, final_size),
+            A.CenterCrop(width=crop_size, height=crop_size),
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+        ])
+
+    transform_train = TrainTransform(crop_size=110, final_size=128)
+    transform_test  = TestTransform(crop_size=110, final_size=128)
+    trainset = VisibleInfraredPairDataset('./data/train_list.txt', transform_train, 
+        prefix="./data/train_vis_ir_images")
     
     trainset.__getitem__(1)
