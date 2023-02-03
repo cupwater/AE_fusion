@@ -7,7 +7,8 @@ from .conv_block import ConvBlock
 class Encoder(nn.Module):
     def __init__(self):
         super(Encoder, self).__init__()
-        self.conv1 = ConvBlock(1,  16, is_reflect=True, act_fun=nn.PReLU, padding=1)
+        #self.conv1 = ConvBlock(1, 16, is_reflect=True, act_fun=nn.PReLU, padding=1)
+        self.conv1 = ConvBlock(1,  16, act_fun=nn.PReLU, padding=1)
         self.conv2 = ConvBlock(16, 16, act_fun=nn.PReLU, padding=1)
         self.conv3 = ConvBlock(16, 16, act_fun=nn.Tanh, padding=1)
         self.conv4 = ConvBlock(16, 16, act_fun=nn.Tanh, padding=1)

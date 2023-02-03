@@ -10,6 +10,7 @@ import shutil
 import time
 import yaml
 import torch
+import torch.onnx
 from skimage.io import imsave
 
 import models
@@ -101,6 +102,14 @@ def main(config_file):
 
     test(testloader, model, criterion_list, use_cuda)
     logger.close()
+
+
+    model.cpu().eval()
+    model_path = f"ae_fusion.onnx"
+    dummy_input = (torch.randn(1, 1, 640, 512), torch.randn(1,1,640,512)) #.to("cuda")
+    torch.onnx.export(model, dummy_input, model_path, verbose=False, input_names=['vis', 'ir'], output_names=['fusion'], opset_version=11)
+
+
 
 
 def train(trainloader, model, criterion_list, optimizer, use_cuda):
