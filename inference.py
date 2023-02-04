@@ -39,7 +39,3 @@ if __name__ == '__main__':
     fuse_image = fuse_vis_ir(vis_image, ir_image, ort_session)[0][0][0]
     from skimage.io import imsave
     imsave(f"data/fuse.jpg", fuse_image)
-    cv2.imshow("Result", fuse_image)
-    key = cv2.waitKey(-1)
-    if key==27 or key == ord("q"):
-        exit(0)
