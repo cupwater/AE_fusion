@@ -1,6 +1,6 @@
 __pycache__
 *.zip
-fusion_onnx_demo
+fusion_onnx_demo/
 *.onnx
 Datasets
 experiments
