@@ -206,8 +206,7 @@ def adjust_learning_rate(optimizer, epoch, config):
 
 if __name__ == '__main__':
     import argparse
-    parser = argparse.ArgumentParser(
-        description='Medical Quality Assessment using AI')
+    parser = argparse.ArgumentParser(description='')
     # model related, including  Architecture, path, datasets
     parser.add_argument('--config-file', type=str, default='experiments/template/config.yaml')
     args = parser.parse_args()
