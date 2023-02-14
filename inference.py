@@ -1,7 +1,7 @@
 '''
 Author: Peng Bo
 Date: 2022-11-13 22:19:55
-LastEditTime: 2023-02-06 09:05:43
+LastEditTime: 2023-02-09 11:19:40
 Description: 
 
 '''
@@ -45,3 +45,6 @@ if __name__ == '__main__':
 
     from skimage.io import imsave
     imsave(f"data/fuse.jpg", fuse_image)
+
+    import onnx_tool
+    onnx_tool.model_profile(onnx_path, None, None) # pass file name

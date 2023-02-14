@@ -103,7 +103,6 @@ def main(config_file):
     test(testloader, model, criterion_list, use_cuda)
     logger.close()
 
-
     model.cpu().eval()
     model_path = f"ae_fusion.onnx"
     dummy_input = (torch.randn(1, 1, 640, 512), torch.randn(1,1,640,512)) #.to("cuda")

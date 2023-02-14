@@ -1,6 +1,8 @@
 import cv2
 import math
 import numpy as np
+import pdb
+import time
 
 
 def DarkChannel(im, sz):
@@ -21,6 +23,7 @@ def AtmLight(im, dark):
     indices = darkvec.argsort()
     indices = indices[imsz-numpx::]
 
+    # pdb.set_trace()
     atmsum = np.zeros([1, 3])
     for ind in range(1, numpx):
         atmsum = atmsum + imvec[indices[ind]]
@@ -84,20 +87,25 @@ if __name__ == '__main__':
     try:
         fn = sys.argv[1]
     except:
-        fn = './data/15.png'
+        fn = './data/test_dehaze.jpeg'
 
     def nothing(*argv):
         pass
 
     src = cv2.imread(fn)
+    src = cv2.resize(src, (960, 540))
 
     I = src.astype('float64')/255
 
     dark = DarkChannel(I, 15)
     A = AtmLight(I, dark)
-    te = TransmissionEstimate(I, A, 15)
-    t = TransmissionRefine(src, te)
-    J = Recover(I, t, A, 0.1)
+
+    for i in range(20):
+        start_time = time.time()
+        te = TransmissionEstimate(I, A, 15)
+        # t = TransmissionRefine(src, te)
+        J = Recover(I, te, A, 0.1)
+        print(f"time: {time.time() - start_time}")
 
     # cv2.imshow("dark", dark)
     # cv2.imshow("t", t)
