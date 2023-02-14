@@ -103,13 +103,6 @@ def main(config_file):
     test(testloader, model, criterion_list, use_cuda)
     logger.close()
 
-    model.cpu().eval()
-    model_path = f"ae_fusion.onnx"
-    dummy_input = (torch.randn(1, 1, 640, 512), torch.randn(1,1,640,512)) #.to("cuda")
-    torch.onnx.export(model, dummy_input, model_path, verbose=False, input_names=['vis', 'ir'], output_names=['fusion'], opset_version=11)
-
-
-
 
 def train(trainloader, model, criterion_list, optimizer, use_cuda):
     # switch to train mode
@@ -126,8 +119,8 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda):
         data_time.update(time.time() - end)
         if use_cuda:
             vis_input, ir_input = vis_input.cuda(), ir_input.cuda()
-        vis_input = torch.autograd.Variable(vis_input)
-        ir_input  = torch.autograd.Variable(ir_input)
+        #vis_input = torch.autograd.Variable(vis_input)
+        #ir_input  = torch.autograd.Variable(ir_input)
         out_vis, vis_feat_bg, vis_feat_detail, out_ir, \
                 ir_feat_bg, ir_feat_detail = model(vis_input, ir_input) 
 
@@ -172,8 +165,8 @@ def test(testloader, model, criterion, use_cuda):
         data_time.update(time.time() - end)
         if use_cuda:
             vis_input, ir_input = vis_input.cuda(), ir_input.cuda()
-        vis_input = torch.autograd.Variable(vis_input)
-        ir_input  = torch.autograd.Variable(ir_input)
+        #vis_input = torch.autograd.Variable(vis_input)
+        #ir_input  = torch.autograd.Variable(ir_input)
 
         fuse_out = model(vis_input, ir_input).cpu().detach().numpy()
         for idx in range(fuse_out.shape[0]):

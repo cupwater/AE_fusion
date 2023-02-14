@@ -23,6 +23,7 @@ state = {}
 best_loss = 999
 use_cuda = True
 
+
 def main(config_file):
     global state, best_loss, use_cuda
 
@@ -46,10 +47,10 @@ def main(config_file):
 
     # create dataset for training and testing
     trainset = dataset.__dict__[data_config['type']](
-        data_config['train_list'], transform_train, 
+        data_config['train_list'], transform_train,
         prefix=data_config['prefix'])
     testset = dataset.__dict__[data_config['type']](
-        data_config['test_list'], transform_test, 
+        data_config['test_list'], transform_test,
         prefix=data_config['prefix'])
 
     # create dataloader for training and testing
@@ -90,8 +91,10 @@ def main(config_file):
     # Train and val
     for epoch in range(common_config['epoch']):
         adjust_learning_rate(optimizer, epoch, common_config)
-        print('\nEpoch: [%d | %d] LR: %f' % (epoch + 1, common_config['epoch'], state['lr']))
-        train_loss = train(trainloader, model, criterion_list, optimizer, use_cuda)
+        print('\nEpoch: [%d | %d] LR: %f' %
+              (epoch + 1, common_config['epoch'], state['lr']))
+        train_loss = train(trainloader, model,
+                           criterion_list, optimizer, use_cuda)
         # append logger file
         logger.append([state['lr'], train_loss, train_loss])
         best_loss = min(train_loss, best_loss)
@@ -103,22 +106,15 @@ def main(config_file):
     test(testloader, model, criterion_list, use_cuda)
     logger.close()
 
-    model.cpu().eval()
-    model_path = f"ae_fusion.onnx"
-    dummy_input = (torch.randn(1, 1, 640, 512), torch.randn(1,1,640,512)) #.to("cuda")
-    torch.onnx.export(model, dummy_input, model_path, verbose=False, input_names=['vis', 'ir'], output_names=['fusion'], opset_version=11)
-
-
-
 
 def train(trainloader, model, criterion_list, optimizer, use_cuda):
     # switch to train mode
     model.train()
 
     batch_time = AverageMeter()
-    data_time  = AverageMeter()
-    losses     = AverageMeter()
-    end        = time.time()
+    data_time = AverageMeter()
+    losses = AverageMeter()
+    end = time.time()
 
     model.train()
     for batch_idx, (vis_input, ir_input) in enumerate(trainloader):
@@ -126,25 +122,7 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda):
         data_time.update(time.time() - end)
         if use_cuda:
             vis_input, ir_input = vis_input.cuda(), ir_input.cuda()
-        vis_input = torch.autograd.Variable(vis_input)
-        ir_input  = torch.autograd.Variable(ir_input)
-        out_vis, vis_feat_bg, vis_feat_detail, out_ir, \
-                ir_feat_bg, ir_feat_detail = model(vis_input, ir_input) 
 
-        all_loss = 0
-        for loss_fun, weight, loss_key in criterion_list:
-            if loss_key   == 'bg_dif':
-                all_loss  += weight * torch.tanh(loss_fun(ir_feat_bg, vis_feat_bg))
-            elif loss_key == 'detail_dif':
-                all_loss  += weight * torch.tanh(loss_fun(ir_feat_detail, vis_feat_detail))
-            elif loss_key == 'vis_rec':
-                all_loss  += weight * loss_fun(out_vis, vis_input)
-            elif loss_key == 'ir_rec':
-                all_loss  += weight * loss_fun(out_ir, ir_input)
-            elif loss_key == 'vis_gradient':
-                all_loss  += weight * loss_fun(vis_input, out_vis)
-            else:
-                print("error, no such loss")
         losses.update(all_loss.item(), vis_input.size(0))
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -173,11 +151,11 @@ def test(testloader, model, criterion, use_cuda):
         if use_cuda:
             vis_input, ir_input = vis_input.cuda(), ir_input.cuda()
         vis_input = torch.autograd.Variable(vis_input)
-        ir_input  = torch.autograd.Variable(ir_input)
+        ir_input = torch.autograd.Variable(ir_input)
 
         fuse_out = model(vis_input, ir_input).cpu().detach().numpy()
         for idx in range(fuse_out.shape[0]):
-            img = fuse_out[idx,0]
+            img = fuse_out[idx, 0]
             imsave(f"data/test_results/{batch_idx}_{idx}.jpg", img)
 
         progress_bar(batch_idx, len(testloader))
@@ -207,6 +185,7 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='')
     # model related, including  Architecture, path, datasets
-    parser.add_argument('--config-file', type=str, default='experiments/template/config.yaml')
+    parser.add_argument('--config-file', type=str,
+                        default='experiments/template/config.yaml')
     args = parser.parse_args()
     main(args.config_file)

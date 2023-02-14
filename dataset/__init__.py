@@ -5,4 +5,5 @@ LastEditTime: 2023-02-02 09:15:15
 Description: In User Settings Edit
 '''
 
+from .pix2pix import *
 from .visible_infrared_dataset import *
