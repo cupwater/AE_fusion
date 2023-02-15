@@ -1,3 +1,10 @@
+'''
+Author: Peng Bo
+Date: 2023-02-15 15:44:37
+LastEditTime: 2023-02-15 18:12:50
+Description: 
+
+'''
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -22,20 +29,43 @@ class AODnet(nn.Module):
         cat3 = torch.cat((x1, x2, x3, x4),1)
         k = F.relu(self.conv5(cat3))
 
-        if k.size() != x.size():
-            raise Exception("k, haze image are different size!")
-
         output = k * x - k + self.b
         return F.relu(output)
 
 
-if __name__ == '__main__':
-    model = AODnet()
+# input_size = (width, height)
+def preprocess(ori_image, input_size=(1920, 1080)):
+    image = cv2.resize(ori_image, input_size)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = image.astype(np.float32)/255.0
+    image = (image - np.array([0.5, 0.5, 0.5]))
+    image = np.divide(image, np.array([0.5, 0.5, 0.5]))
+    image = np.expand_dims(np.transpose(image, [2, 0, 1]), axis=0)
+    image = image.astype(np.float32)
+    return image
 
-    onnx_path = "data/test_dehaze.onnx"
-    dummy_input = torch.randn(1, 3, 960, 540) 
-    torch.onnx.export(model, dummy_input, onnx_path, verbose=False, 
-                input_names=['input'], output_names=['output'], 
-                opset_version=11)
-    import onnx_tool
-    onnx_tool.model_profile(onnx_path, None, None) # pass file name
+if __name__ == '__main__':
+
+    import numpy as np
+    import cv2
+
+    ori_img = cv2.imread("dehaze_data/dehaze_input.jpg")
+    processed_frame = preprocess(ori_img)
+
+    pt_model = AODnet()
+    pt_model.load_state_dict(torch.load("dehaze_data/AODNet_dehaze.pth", map_location='cpu'))
+    pt_model.eval()
+    # inference using pytorch model 
+    pt_output = pt_model(torch.FloatTensor(torch.from_numpy(processed_frame)))
+    # convert the output to image
+    pt_output = pt_output.data.cpu().numpy().squeeze().transpose((1,2,0))*255
+    cv2.imwrite("dehaze_data/dehaze_output_pt.jpg", pt_output.astype(np.uint8)[:,:,::-1])
+    
+    # inference using onnx model 
+    import onnxruntime as ort
+    onnx_model = ort.InferenceSession("dehaze_data/AODNet_Dehaze.onnx")
+    prediction = onnx_model.run(None, {"input": processed_frame})[0][0]
+    prediction = prediction.transpose((1,2,0))*255
+    cv2.imwrite("dehaze_data/dehaze_output_onnx.jpg", prediction.astype(np.uint8)[:,:,::-1])
+
+
