@@ -33,8 +33,8 @@ def fuse_vis_ir(vis_image, ir_image, ort_session, input_size=(512, 640)):
 if __name__ == '__main__':
     onnx_path = "experiments/template/ae_fusion.onnx"
     ort_session = ort.InferenceSession(onnx_path)
-    vis_image = cv2.imread("data/test_vis.jpg")
-    ir_image  = cv2.imread("data/test_ir.jpg")
+    vis_image = cv2.imread("fusion_data/test_vis.jpg")
+    ir_image  = cv2.imread("fusion_data/test_ir.jpg")
 
     for i in range(20):
         fuse_image = fuse_vis_ir(vis_image, ir_image, ort_session)[0][0][0]
@@ -44,7 +44,7 @@ if __name__ == '__main__':
         print("inference time:{}".format(time.time() - start_time))
 
     from skimage.io import imsave
-    imsave(f"data/fuse.jpg", fuse_image)
+    imsave(f"fusion_data/fuse.jpg", fuse_image)
 
     import onnx_tool
     onnx_tool.model_profile(onnx_path, None, None) # pass file name

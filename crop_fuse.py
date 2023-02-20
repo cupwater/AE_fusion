@@ -45,7 +45,7 @@ def fusion_imgs(img1, img2):
 
 
 if __name__ == "__main__":
-    img = cv2.imread('data/test_vis.jpg')
+    img = cv2.imread('fusion_data/test_vis.jpg')
     _, reverse_img = crop_tetragon(img)
     fuse_img = fusion_imgs(img, reverse_img)
-    cv2.imwrite('data/fuse_img.jpg', fuse_img)
+    cv2.imwrite('fusion_data/fuse_img.jpg', fuse_img)

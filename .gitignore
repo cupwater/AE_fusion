@@ -1,4 +1,5 @@
 __pycache__
+*.tar
 *.jpg
 *.zip
 fusion_onnx_demo/

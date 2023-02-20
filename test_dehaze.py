@@ -52,7 +52,7 @@ if __name__ == '__main__':
     pt_model.eval()
 
     onnx_model = ort.InferenceSession("dehaze_data/AODNet_Dehaze.onnx")
-    cap = cv2.VideoCapture('data/haze-videos/fog.mp4')
+    cap = cv2.VideoCapture('dehaze_data/fog.mp4')
     while True:
         ret, frame = cap.read()
         frame = cv2.resize(frame, (1920, 1080))
