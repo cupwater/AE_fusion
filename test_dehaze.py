@@ -53,18 +53,25 @@ if __name__ == '__main__':
 
     onnx_model = ort.InferenceSession("dehaze_data/AODNet_Dehaze.onnx")
     cap = cv2.VideoCapture('dehaze_data/fog.mp4')
+
+    videoWriter = cv2.VideoWriter('dehaze_data/defog.mp4', cv2.VideoWriter_fourcc('m','p','4','v'), 25, (1920, 1080))
+
     while True:
         ret, frame = cap.read()
         frame = cv2.resize(frame, (1920, 1080))
         if not ret:
             break
-        dehaze_image_pt   = dehaze_pt(frame, pt_model)
+        # dehaze_image_pt   = dehaze_pt(frame, pt_model)
         dehaze_image_onnx = dehaze_onnx(frame, onnx_model)
+        videoWriter.write(dehaze_image_onnx)
 
-        cv2.imshow("haze image", frame)
-        cv2.imshow("dehaze image using pt_model", dehaze_image_pt)
+        # cv2.imshow("haze image", frame)
+        # cv2.imshow("dehaze image using pt_model", dehaze_image_pt)
         cv2.imshow("dehaze image using onnx model", dehaze_image_onnx)
 
-        key = cv2.waitKey(1)
-        if key==27 or key == ord("q"):
-            exit(0)
+        # key = cv2.waitKey(1)
+        # if key==27 or key == ord("q"):
+        #     exit(0)
+
+    cap.release()
+    videoWriter.release()
