@@ -13,6 +13,8 @@ import torch
 import torch.onnx
 from skimage.io import imsave
 
+import pdb
+
 import models
 import dataset
 import losses
@@ -131,6 +133,7 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda):
             elif loss_key == 'vis_rec':
                 all_loss  += weight * loss_fun(out_vis, vis_input)
             elif loss_key == 'ir_rec':
+                pdb.set_trace()
                 all_loss  += weight * loss_fun(out_ir, ir_input)
             elif loss_key == 'vis_gradient':
                 all_loss  += weight * loss_fun(vis_input, out_vis)
