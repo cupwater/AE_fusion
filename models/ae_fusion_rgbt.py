@@ -1,7 +1,7 @@
 '''
 Author: Peng Bo
 Date: 2023-02-02 08:25:04
-LastEditTime: 2023-02-27 17:12:55
+LastEditTime: 2023-02-27 17:16:33
 Description: 
 
 '''
@@ -9,7 +9,7 @@ Description:
 import torch
 from torch import nn
 
-__all__ = ["AutoEncoder"]
+__all__ = ["AutoEncoderRGBT"]
 
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, 
@@ -34,10 +34,10 @@ class ConvBlock(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self):
+    def __init__(self, in_channels=1):
         super(Encoder, self).__init__()
         #self.conv1 = ConvBlock(1, 16, is_reflect=True, act_fun=nn.PReLU, padding=1)
-        self.conv1 = ConvBlock(1,  16, act_fun=nn.PReLU, padding=1)
+        self.conv1 = ConvBlock(in_channels,  16, act_fun=nn.PReLU, padding=1)
         self.conv2 = ConvBlock(16, 16, act_fun=nn.PReLU, padding=1)
         self.conv3 = ConvBlock(16, 16, act_fun=nn.Tanh, padding=1)
         self.conv4 = ConvBlock(16, 16, act_fun=nn.Tanh, padding=1)
@@ -51,11 +51,11 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self):
+    def __init__(self, out_channels=1):
         super(Decoder, self).__init__()
         self.conv1 = ConvBlock(32, 16, act_fun=nn.PReLU, padding=1)
         self.conv2 = ConvBlock(32, 16, act_fun=nn.PReLU, padding=1)
-        self.conv3 = ConvBlock(32, 1,  act_fun=nn.Sigmoid, padding=1)
+        self.conv3 = ConvBlock(32, out_channels,  act_fun=nn.Sigmoid, padding=1)
 
     def forward(self, feat1, feat2, featB, featD):
         out = self.conv1(torch.cat([featB, featD], 1))
@@ -63,17 +63,18 @@ class Decoder(nn.Module):
         out = self.conv3(torch.cat([out, feat1], 1))
         return out
 
-class AutoEncoder(nn.Module):
+class AutoEncoderRGBT(nn.Module):
     def __init__(self, fuse_mode='Sum'):
-        super(AutoEncoder, self).__init__()
-        self.encoder = Encoder()
-        self.decoder = Decoder()
+        super(AutoEncoderRGBT, self).__init__()
+        self.encoder_rgb = Encoder(in_channels=3)
+        self.encoder_t   = Encoder(in_channels=1)
+        self.decoder = Decoder(out_channels=3)
         self.fuse_mode = fuse_mode
     
     def forward(self, vis_input, ir_input):
 
-        vis_feat1, vis_feat2, vis_feat_bg, vis_feat_detail = self.encoder(vis_input)
-        ir_feat1,  ir_feat2,  ir_feat_bg,  ir_feat_detail  = self.encoder(ir_input)
+        vis_feat1, vis_feat2, vis_feat_bg, vis_feat_detail = self.encoder_rgb(vis_input)
+        ir_feat1,  ir_feat2,  ir_feat_bg,  ir_feat_detail  = self.encoder_t(ir_input)
 
         if self.training:
             out_vis = self.decoder(vis_feat1, vis_feat2, vis_feat_bg, vis_feat_detail)

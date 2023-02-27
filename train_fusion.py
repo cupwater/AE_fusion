@@ -119,8 +119,6 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda):
         data_time.update(time.time() - end)
         if use_cuda:
             vis_input, ir_input = vis_input.cuda(), ir_input.cuda()
-        #vis_input = torch.autograd.Variable(vis_input)
-        #ir_input  = torch.autograd.Variable(ir_input)
         out_vis, vis_feat_bg, vis_feat_detail, out_ir, \
                 ir_feat_bg, ir_feat_detail = model(vis_input, ir_input) 
 
