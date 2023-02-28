@@ -8,6 +8,7 @@ Description:
 # coding: utf8
 import torch
 from torch import nn
+import pdb
 
 __all__ = ["AutoEncoderRGBT"]
 
@@ -68,7 +69,8 @@ class AutoEncoderRGBT(nn.Module):
         super(AutoEncoderRGBT, self).__init__()
         self.encoder_rgb = Encoder(in_channels=3)
         self.encoder_t   = Encoder(in_channels=1)
-        self.decoder = Decoder(out_channels=3)
+        self.decoder_rgb = Decoder(out_channels=3)
+        self.decoder_t   = Decoder(out_channels=1)
         self.fuse_mode = fuse_mode
     
     def forward(self, vis_input, ir_input):
@@ -77,8 +79,8 @@ class AutoEncoderRGBT(nn.Module):
         ir_feat1,  ir_feat2,  ir_feat_bg,  ir_feat_detail  = self.encoder_t(ir_input)
 
         if self.training:
-            out_vis = self.decoder(vis_feat1, vis_feat2, vis_feat_bg, vis_feat_detail)
-            out_ir  = self.decoder(ir_feat1,  ir_feat2,  ir_feat_bg,  ir_feat_detail)
+            out_vis = self.decoder_rgb(vis_feat1, vis_feat2, vis_feat_bg, vis_feat_detail)
+            out_ir  = self.decoder_t(ir_feat1,  ir_feat2,  ir_feat_bg,  ir_feat_detail)
             return out_vis, vis_feat_bg, vis_feat_detail, out_ir, ir_feat_bg, ir_feat_detail
         else:
             if self.fuse_mode == 'Sum':
@@ -97,5 +99,6 @@ class AutoEncoderRGBT(nn.Module):
             else:
                 print('Wrong!')
 
-            out = self.decoder(feat1, feat2, feat_bg, feat_detail)
+            out = self.decoder_rgb(feat1, feat2, feat_bg, feat_detail)
             return out
+

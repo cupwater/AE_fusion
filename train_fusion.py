@@ -11,6 +11,7 @@ import time
 import yaml
 import torch
 import torch.onnx
+import numpy as np
 from skimage.io import imsave
 
 import pdb
@@ -25,7 +26,7 @@ state = {}
 best_loss = 999
 use_cuda = True
 
-def main(config_file):
+def main(config_file, is_eval):
     global state, best_loss, use_cuda
 
     # parse config of model training
@@ -51,8 +52,11 @@ def main(config_file):
         data_config['train_list'], transform_train, 
         prefix=data_config['prefix'])
     testset = dataset.__dict__[data_config['type']](
-        data_config['test_list'], transform_test, 
+        data_config['test_list'], transform=None,
         prefix=data_config['prefix'])
+    # testset = dataset.__dict__[data_config['type']](
+    #     data_config['test_list'], transform_test, 
+    #     prefix=data_config['prefix'])
 
     # create dataloader for training and testing
     trainloader = torch.utils.data.DataLoader(
@@ -89,6 +93,12 @@ def main(config_file):
     logger = Logger(os.path.join(common_config['save_path'], 'log.txt'))
     logger.set_names(['Learning Rate', 'Train Loss', 'Valid Loss'])
 
+    if is_eval:
+        model.load_state_dict(torch.load(os.path.join(common_config['save_path'], 'checkpoint.pth.tar'))[
+                              'state_dict'], strict=True)
+        test(testloader, model, criterion_list, use_cuda)
+        return 
+        
     # Train and val
     for epoch in range(common_config['epoch']):
         adjust_learning_rate(optimizer, epoch, common_config)
@@ -102,7 +112,7 @@ def main(config_file):
             'state_dict': model.state_dict(),
         }, train_loss < best_loss, save_path=common_config['save_path'])
 
-    test(testloader, model, criterion_list, use_cuda)
+        test(testloader, model, criterion_list, use_cuda)
     logger.close()
 
 
@@ -133,7 +143,6 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda):
             elif loss_key == 'vis_rec':
                 all_loss  += weight * loss_fun(out_vis, vis_input)
             elif loss_key == 'ir_rec':
-                pdb.set_trace()
                 all_loss  += weight * loss_fun(out_ir, ir_input)
             elif loss_key == 'vis_gradient':
                 all_loss  += weight * loss_fun(vis_input, out_vis)
@@ -166,13 +175,11 @@ def test(testloader, model, criterion, use_cuda):
         data_time.update(time.time() - end)
         if use_cuda:
             vis_input, ir_input = vis_input.cuda(), ir_input.cuda()
-        #vis_input = torch.autograd.Variable(vis_input)
-        #ir_input  = torch.autograd.Variable(ir_input)
 
         fuse_out = model(vis_input, ir_input).cpu().detach().numpy()
         for idx in range(fuse_out.shape[0]):
-            img = fuse_out[idx,0]
-            imsave(f"data/test_results/{batch_idx}_{idx}.jpg", img)
+            img = np.transpose(fuse_out[idx], (1,2,0))
+            imsave(f"data/fusion/test_results/{batch_idx}_{idx}.jpg", img)
 
         progress_bar(batch_idx, len(testloader))
         # measure elapsed time
@@ -202,5 +209,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     # model related, including  Architecture, path, datasets
     parser.add_argument('--config-file', type=str, default='experiments/template/config.yaml')
+    parser.add_argument('--eval', action='store_true')
     args = parser.parse_args()
-    main(args.config_file)
+    import pdb
+    pdb.set_trace()
+    main(args.config_file, args.eval)
