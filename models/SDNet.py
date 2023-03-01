@@ -14,13 +14,20 @@ __all__ = ["SDNet"]
 
 
 class ConvBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3,  act_fun=nn.PReLU, padding=1):
+    def __init__(self, in_channels, out_channels, kernel_size=3,  
+                    act_fun=nn.PReLU, BN=nn.BatchNorm2d, padding=1):
         super(ConvBlock, self).__init__()
-        self.conv = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size, padding=padding),
-            nn.BatchNorm2d(out_channels),
-            act_fun()
-        )
+        if not BN is None:
+            self.conv = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, kernel_size, padding=padding),
+                BN(out_channels),
+                act_fun()
+            )
+        else:
+            self.conv = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, kernel_size, padding=padding),
+                act_fun()
+            )
 
     def forward(self, x):
         return self.conv(x)
@@ -49,7 +56,7 @@ class DisassembleBlock(nn.Module):
         self.conv2 = ConvBlock(mid_channels, mid_channels)
         self.dec_layer = nn.Sequential(
             nn.Conv2d(mid_channels, out_channels, 3, padding=1),
-            nn.Tanh()
+            nn.Sigmoid()
         )
 
     def forward(self, x):  
@@ -66,7 +73,7 @@ class SqueezeNet(nn.Module):
         self.ir_branch  = DenseBlock(ir_channels,  mid_channels)
         self.fuse_layer = nn.Sequential(
             nn.Conv2d(8*mid_channels, out_channels, 3, padding=1),
-            nn.Tanh()
+            nn.Sigmoid()
         )
 
     def forward(self, vis_in, ir_in):  

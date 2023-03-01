@@ -94,6 +94,8 @@ def main(config_file, is_eval):
             common_config['save_path'], 'checkpoint.pth.tar'))['state_dict'], strict=True)
         return
 
+    model = torch.nn.DataParallel(model, device_ids=[0,1,2])
+
     # Train and val
     for epoch in range(common_config['epoch']):
         adjust_learning_rate(optimizer, epoch, common_config)
@@ -167,6 +169,29 @@ def train(trainloader, model, optimizer, use_cuda, epoch, print_interval=100):
         batch_time.update(time.time() - end)
         end = time.time()
     return (losses_intensity.avg, losses_reconstruct.avg, losses_gradient.avg, losses.avg)
+
+
+def test(testloader, model, use_cuda):
+    # switch to evaluate mode
+    model.eval()
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    end = time.time()
+    model.eval()
+    for batch_idx, (vis_in, ir_in) in enumerate(testloader):
+        # measure data loading time
+        data_time.update(time.time() - end)
+        if use_cuda:
+            vis_in, ir_in = vis_in.cuda(), ir_in.cuda()
+        fused_img, _, _ = model(vis_in, ir_in)
+        for idx in range(fused_img.shape[0]):
+            img = np.transpose(fused_img, (1, 2, 0))
+            imsave(f"data/fusion/test_results/{batch_idx}_{idx}.jpg", img)
+        progress_bar(batch_idx, len(testloader))
+        # measure elapsed time
+        batch_time.update(time.time() - end)
+        end = time.time()
+    return 
 
 
 def save_checkpoint(state, is_best, save_path, filename='checkpoint.pth.tar'):
