@@ -12,6 +12,6 @@ def low_pass(input):
     weight = torch.nn.Parameter(torch.FloatTensor(
                 [[0.0947,0.1183,0.0947],
                     [0.1183,0.1478,0.1183],
-                    [0.0947,0.1183,0.0947]]).reshape(1,1,3,3))
+                    [0.0947,0.1183,0.0947]]).reshape(1,1,3,3)).cuda()
     return F.conv2d(input, weight, padding=1)
 

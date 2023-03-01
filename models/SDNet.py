@@ -31,8 +31,8 @@ class DenseBlock(nn.Module):
         super(DenseBlock, self).__init__()
         self.conv1 = ConvBlock(in_channels,  mid_channels)
         self.conv2 = ConvBlock(mid_channels, mid_channels)
-        self.conv3 = ConvBlock(mid_channels, mid_channels)
-        self.conv4 = ConvBlock(mid_channels, mid_channels)
+        self.conv3 = ConvBlock(2*mid_channels, mid_channels)
+        self.conv4 = ConvBlock(3*mid_channels, mid_channels)
 
     def forward(self, x):  
         x1 = self.conv1(x)
@@ -48,7 +48,7 @@ class DisassembleBlock(nn.Module):
         self.conv1 = ConvBlock(in_channels,  mid_channels)
         self.conv2 = ConvBlock(mid_channels, mid_channels)
         self.dec_layer = nn.Sequential(
-            nn.Conv2d(mid_channels, out_channels, padding=1),
+            nn.Conv2d(mid_channels, out_channels, 3, padding=1),
             nn.Tanh()
         )
 
@@ -60,12 +60,12 @@ class DisassembleBlock(nn.Module):
 
 
 class SqueezeNet(nn.Module):
-    def __init__(self, vis_channels=3, ir_channels=1, out_channels=3, mid_channels=16):
+    def __init__(self, vis_channels=3, ir_channels=3, out_channels=3, mid_channels=16):
         super(SqueezeNet, self).__init__()
         self.vis_branch = DenseBlock(vis_channels, mid_channels)
         self.ir_branch  = DenseBlock(ir_channels,  mid_channels)
         self.fuse_layer = nn.Sequential(
-            nn.Conv2d(8*mid_channels, out_channels, padding=1),
+            nn.Conv2d(8*mid_channels, out_channels, 3, padding=1),
             nn.Tanh()
         )
 
@@ -77,11 +77,11 @@ class SqueezeNet(nn.Module):
 
 
 class DecomposeNet(nn.Module):
-    def __init__(self, in_channels=3, mid_channels=16, vis_channels=3, ir_channels=1):
+    def __init__(self, in_channels=3, mid_channels=16, vis_channels=3, ir_channels=3):
         super(DecomposeNet, self).__init__()
         self.extract_layer = ConvBlock(in_channels, mid_channels)
-        self.vis_branch = DisassembleBlock(in_channels, mid_channels, 3)
-        self.ir_branch  = DisassembleBlock(in_channels, mid_channels, 1)
+        self.vis_branch = DisassembleBlock(mid_channels, mid_channels, vis_channels)
+        self.ir_branch  = DisassembleBlock(mid_channels, mid_channels, ir_channels)
 
     def forward(self, x):  
         mid_feat = self.extract_layer(x)
@@ -91,7 +91,7 @@ class DecomposeNet(nn.Module):
     
 
 class SDNet(nn.Module):
-    def __init__(self, fuse_channels=3, mid_channels=16, vis_channels=3, ir_channels=1):
+    def __init__(self, fuse_channels=3, mid_channels=16, vis_channels=3, ir_channels=3):
         super(SDNet, self).__init__()
         self.squeeze   = SqueezeNet(vis_channels, ir_channels, fuse_channels, mid_channels)
         self.decompose = DecomposeNet(fuse_channels, mid_channels, vis_channels, ir_channels)

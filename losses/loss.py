@@ -149,8 +149,6 @@ class AdaptiveGradientL2Loss(nn.Module):
 
         img1_grad_lowpass = self.gradient_fun(low_pass(img1))
         img2_grad_lowpass = self.gradient_fun(low_pass(img2))
-
         img1_score = torch.sign(img1_grad_lowpass - torch.minimum(img1_grad_lowpass, img2_grad_lowpass))
-        img2_score = 1 - img1_score
 
-        return img2_score*self.l2loss( self.gradient_fun(img1), self.gradient_fun(img2) )
+        return img1_score.detach()*self.l2loss( self.gradient_fun(img1), self.gradient_fun(img2) )

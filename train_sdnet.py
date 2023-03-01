@@ -19,7 +19,7 @@ import pdb
 
 import models
 import dataset
-import losses
+from losses import AdaptiveGradientL2Loss, GradientL2Loss
 from torch.nn import functional as F
 from augmentation.augment import TrainTransform, TestTransform
 from utils import low_pass, Logger, AverageMeter, mkdir_p, progress_bar
@@ -127,7 +127,8 @@ def train(trainloader, model, optimizer, use_cuda, epoch, print_interval=100):
 
     end = time.time()
 
-    criterion_AdapGradLoss = losses['AdaptiveGradientLoss']()
+    criterion_GradLoss = GradientL2Loss()
+    gradfun = kornia.filters.SpatialGradient()
     model.train()
     for batch_idx, (vis_in, ir_in) in enumerate(trainloader):
         # measure data loading time
@@ -141,13 +142,21 @@ def train(trainloader, model, optimizer, use_cuda, epoch, print_interval=100):
                     0.5*F.mse_loss(fused_img, ir_in, reduction='mean')
         loss_reconstruct = F.mse_loss(vis_out, vis_in, reduction='mean') + \
                     F.mse_loss(ir_out, ir_in, reduction='mean')
-        loss_gradient = criterion_AdapGradLoss(fused_img, vis_in) + \
-                    criterion_AdapGradLoss(fused_img, ir_in)
+
+        # 维度对不上，应该是 element-wise 
+        vis_grad_lowpass = gradfun(low_pass(torch.mean(vis_in, dim=1, keepdim=True)))
+        ir_grad_lowpass  = gradfun(low_pass(torch.mean(ir_in, dim=1, keepdim=True)))
+        vis_score = torch.sign(vis_grad_lowpass - torch.minimum(vis_grad_lowpass, ir_grad_lowpass))
+        ir_score  = 1 - vis_score
+
+        loss_gradient = vis_score.detach()*criterion_GradLoss(fused_img, vis_in) + \
+                    ir_score.detach()*criterion_GradLoss(fused_img, ir_in)
         all_loss = loss_intensity + 80 * loss_gradient + loss_reconstruct
 
-        losses_intensity.append(loss_intensity, vis_in.size(0)) 
-        losses_reconstruct.append(loss_reconstruct, vis_in.size(0)) 
-        losses_gradient.append(loss_gradient, vis_in.size(0)) 
+        losses_intensity.update(loss_intensity, vis_in.size(0)) 
+        losses_reconstruct.update(loss_reconstruct, vis_in.size(0)) 
+        losses_gradient.update(loss_gradient, vis_in.size(0)) 
+        pdb.set_trace()
         losses.update(all_loss.item(), vis_in.size(0))
 
         # compute gradient and do SGD step
