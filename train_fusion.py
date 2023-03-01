@@ -26,6 +26,7 @@ state = {}
 best_loss = 999
 use_cuda = True
 
+
 def main(config_file, is_eval):
     global state, best_loss, use_cuda
 
@@ -49,13 +50,13 @@ def main(config_file, is_eval):
 
     # create dataset for training and testing
     trainset = dataset.__dict__[data_config['type']](
-        data_config['train_list'], transform_train, 
+        data_config['train_list'], transform_train,
         prefix=data_config['prefix'])
     testset = dataset.__dict__[data_config['type']](
         data_config['test_list'], transform=None,
         prefix=data_config['prefix'])
     # testset = dataset.__dict__[data_config['type']](
-    #     data_config['test_list'], transform_test, 
+    #     data_config['test_list'], transform_test,
     #     prefix=data_config['prefix'])
 
     # create dataloader for training and testing
@@ -91,39 +92,51 @@ def main(config_file, is_eval):
 
     # logger
     logger = Logger(os.path.join(common_config['save_path'], 'log.txt'))
-    logger.set_names(['Learning Rate', 'Train Loss', 'Valid Loss'])
+    logger.set_names(['Learning Rate', 'bg_diff', 'detail_diff',
+                     'vis_rec', 'ir_rec', 'vis_gradient', 'loss'])
 
     if is_eval:
-        model.load_state_dict(torch.load(os.path.join(common_config['save_path'], 'checkpoint.pth.tar'))[
-                              'state_dict'], strict=True)
+        model.load_state_dict(torch.load(os.path.join(
+            common_config['save_path'], 'checkpoint.pth.tar'))['state_dict'], strict=True)
         test(testloader, model, criterion_list, use_cuda)
-        return 
-        
+        return
+
     # Train and val
     for epoch in range(common_config['epoch']):
         adjust_learning_rate(optimizer, epoch, common_config)
-        print('\nEpoch: [%d | %d] LR: %f' % (epoch + 1, common_config['epoch'], state['lr']))
-        train_loss = train(trainloader, model, criterion_list, optimizer, use_cuda)
+        print('\nEpoch: [%d | %d] LR: %f' %
+              (epoch + 1, common_config['epoch'], state['lr']))
+        bg_diff, detail_diff, vis_rec, ir_rec, vis_gradient, loss = \
+                            train(trainloader, model, criterion_list, optimizer, \
+                                  use_cuda, epoch, common_config['print_interval'])
         # append logger file
-        logger.append([state['lr'], train_loss, train_loss])
-        best_loss = min(train_loss, best_loss)
+        logger.append([state['lr'], bg_diff, detail_diff,
+                      vis_rec, ir_rec, vis_gradient, loss])
+        best_loss = min(loss, best_loss)
         save_checkpoint({
             'epoch': epoch + 1,
             'state_dict': model.state_dict(),
-        }, train_loss < best_loss, save_path=common_config['save_path'])
+        }, loss < best_loss, save_path=common_config['save_path'])
 
-        test(testloader, model, criterion_list, use_cuda)
+    test(testloader, model, criterion_list, use_cuda)
     logger.close()
 
 
-def train(trainloader, model, criterion_list, optimizer, use_cuda):
+def train(trainloader, model, criterion_list, optimizer, use_cuda, epoch, print_interval=100):
     # switch to train mode
     model.train()
 
     batch_time = AverageMeter()
-    data_time  = AverageMeter()
-    losses     = AverageMeter()
-    end        = time.time()
+    data_time = AverageMeter()
+    losses = AverageMeter()
+
+    bg_diff = AverageMeter()
+    detail_diff = AverageMeter()
+    vis_rec = AverageMeter()
+    ir_rec = AverageMeter()
+    vis_gradient = AverageMeter()
+
+    end = time.time()
 
     model.train()
     for batch_idx, (vis_input, ir_input) in enumerate(trainloader):
@@ -132,32 +145,49 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda):
         if use_cuda:
             vis_input, ir_input = vis_input.cuda(), ir_input.cuda()
         out_vis, vis_feat_bg, vis_feat_detail, out_ir, \
-                ir_feat_bg, ir_feat_detail = model(vis_input, ir_input) 
+            ir_feat_bg, ir_feat_detail = model(vis_input, ir_input)
 
         all_loss = 0
         for loss_fun, weight, loss_key in criterion_list:
-            if loss_key   == 'bg_dif':
-                all_loss  += weight * torch.tanh(loss_fun(ir_feat_bg, vis_feat_bg))
+            if loss_key == 'bg_dif':
+                temp_loss = weight * \
+                    torch.tanh(loss_fun(ir_feat_bg, vis_feat_bg))
+                bg_diff.update(temp_loss.item(), vis_input.size(0))
             elif loss_key == 'detail_dif':
-                all_loss  += weight * torch.tanh(loss_fun(ir_feat_detail, vis_feat_detail))
+                temp_loss = weight * \
+                    torch.tanh(loss_fun(ir_feat_detail, vis_feat_detail))
+                detail_diff.update(temp_loss)
             elif loss_key == 'vis_rec':
-                all_loss  += weight * loss_fun(out_vis, vis_input)
+                temp_loss = weight * loss_fun(out_vis, vis_input)
+                vis_rec.update(temp_loss)
             elif loss_key == 'ir_rec':
-                all_loss  += weight * loss_fun(out_ir, ir_input)
+                temp_loss = weight * loss_fun(out_ir, ir_input)
+                ir_rec.update(temp_loss)
             elif loss_key == 'vis_gradient':
-                all_loss  += weight * loss_fun(vis_input, out_vis)
+                temp_loss = weight * loss_fun(vis_input, out_vis)
+                vis_gradient.update(temp_loss)
             else:
                 print("error, no such loss")
+            all_loss += temp_loss
+
         losses.update(all_loss.item(), vis_input.size(0))
         # compute gradient and do SGD step
         optimizer.zero_grad()
         all_loss.backward()
         optimizer.step()
-        progress_bar(batch_idx, len(trainloader), 'Loss: %.2f ' % (losses.avg))
+
+        if batch_idx % print_interval == 0:
+            print("iter: %d, epoch: %d, bg_dif: %.3f, detail_dif, %.3f, \
+                    vis_rec: %.3f, ir_rec: %.3f, vis_gradient: %.3f, losses: %.3f" % (
+                batch_idx, epoch, bg_diff.avg, detail_diff.avg,
+                vis_rec.avg, ir_rec.avg, vis_gradient.avg, losses.avg))
+
+        # progress_bar(batch_idx, len(trainloader), 'Loss: %.2f ' % (losses.avg))
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
-    return (losses.avg)
+    return (bg_diff.avg, detail_diff.avg, vis_rec.avg,
+            ir_rec.avg, vis_gradient.avg, losses.avg)
 
 
 def test(testloader, model, criterion, use_cuda):
@@ -178,7 +208,7 @@ def test(testloader, model, criterion, use_cuda):
 
         fuse_out = model(vis_input, ir_input).cpu().detach().numpy()
         for idx in range(fuse_out.shape[0]):
-            img = np.transpose(fuse_out[idx], (1,2,0))
+            img = np.transpose(fuse_out[idx], (1, 2, 0))
             imsave(f"data/fusion/test_results/{batch_idx}_{idx}.jpg", img)
 
         progress_bar(batch_idx, len(testloader))
@@ -208,7 +238,8 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='')
     # model related, including  Architecture, path, datasets
-    parser.add_argument('--config-file', type=str, default='experiments/template/config.yaml')
+    parser.add_argument('--config-file', type=str,
+                        default='experiments/template/config.yaml')
     parser.add_argument('--eval', action='store_true')
     args = parser.parse_args()
     import pdb
