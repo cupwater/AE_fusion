@@ -127,8 +127,7 @@ def train(trainloader, model, optimizer, use_cuda, epoch, print_interval=100):
 
     end = time.time()
 
-    criterion_GradLoss = GradientL2Loss()
-    gradfun = kornia.filters.SpatialGradient()
+    criterion_AdapGradLoss = AdaptiveGradientL2Loss()
     model.train()
     for batch_idx, (vis_in, ir_in) in enumerate(trainloader):
         # measure data loading time
@@ -143,14 +142,7 @@ def train(trainloader, model, optimizer, use_cuda, epoch, print_interval=100):
         loss_reconstruct = F.mse_loss(vis_out, vis_in, reduction='mean') + \
                     F.mse_loss(ir_out, ir_in, reduction='mean')
 
-        # 维度对不上，应该是 element-wise 
-        vis_grad_lowpass = gradfun(low_pass(torch.mean(vis_in, dim=1, keepdim=True)))
-        ir_grad_lowpass  = gradfun(low_pass(torch.mean(ir_in, dim=1, keepdim=True)))
-        vis_score = torch.sign(vis_grad_lowpass - torch.minimum(vis_grad_lowpass, ir_grad_lowpass))
-        ir_score  = 1 - vis_score
-
-        loss_gradient = vis_score.detach()*criterion_GradLoss(fused_img, vis_in) + \
-                    ir_score.detach()*criterion_GradLoss(fused_img, ir_in)
+        loss_gradient = criterion_AdapGradLoss(fused_img, vis_in, ir_in)
         all_loss = loss_intensity + 80 * loss_gradient + loss_reconstruct
 
         losses_intensity.update(loss_intensity, vis_in.size(0)) 
