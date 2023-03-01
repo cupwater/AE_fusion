@@ -177,8 +177,13 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda, epoch, print_
         optimizer.step()
 
         if batch_idx % print_interval == 0:
+<<<<<<< HEAD
             print("iter: %d, epoch: %d, bg_dif: %.3f, detail_dif, %.3f, \
                     vis_rec: %.3f, ir_rec: %.3f, vis_gradient: %.3f, losses: %.3f" % (
+=======
+            print("iter/epoch: %d / %d \t bg_dif: %.3f \t detail_dif: %.3f, \
+                    vis_rec: %.3f \t ir_rec: %.3f \t vis_gradient: %.3f \t losses: %.3f" % (
+>>>>>>> gitee/main
                 batch_idx, epoch, bg_diff.avg, detail_diff.avg,
                 vis_rec.avg, ir_rec.avg, vis_gradient.avg, losses.avg))
 
@@ -242,6 +247,4 @@ if __name__ == '__main__':
                         default='experiments/template/config.yaml')
     parser.add_argument('--eval', action='store_true')
     args = parser.parse_args()
-    import pdb
-    pdb.set_trace()
     main(args.config_file, args.eval)
