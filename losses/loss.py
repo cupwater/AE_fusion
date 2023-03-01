@@ -2,7 +2,7 @@
 '''
 Author: Pengbo
 Date: 2022-02-23 16:17:31
-LastEditTime: 2023-02-02 16:15:24
+LastEditTime: 2023-03-01 18:29:42
 Description: loss function
 
 '''
@@ -11,8 +11,10 @@ from torch import nn
 from torch.nn import functional as F
 import kornia
 
+from utils.utils import low_pass
 
-__all__ = ['L1Loss', 'MS_SSIMLoss', 'GradientL1Loss', 'BCELoss', 'BCEFocalLoss', 'FocalLoss']
+
+__all__ = ['L1Loss', 'L2Loss', 'MS_SSIMLoss', 'GradientL1Loss', 'GradientL2Loss', 'AdaptiveGradientL2Loss', 'BCELoss', 'BCEFocalLoss', 'FocalLoss']
 
 class L1Loss(nn.Module):
     def __init__(self):
@@ -20,6 +22,15 @@ class L1Loss(nn.Module):
 
     def forward(self, input, target):
         return F.l1_loss(input, target, reduction='mean')
+
+
+class L2Loss(nn.Module):
+    def __init__(self):
+        super(L2Loss, self).__init__()
+
+    def forward(self, input, target):
+        return F.mse_loss(input, target, reduction='mean')
+
 
 class BCELoss(nn.Module):
     def __init__(self):
@@ -108,10 +119,38 @@ class MS_SSIMLoss(nn.Module):
         return self.ssim(img1, img2) + self.mse(img1, img2)
     
 class GradientL1Loss(nn.Module):
-    def __init__(self, window_size=11, max_val=1.0):
+    def __init__(self):
         super(GradientL1Loss, self).__init__()
         self.gradient_fun = kornia.filters.SpatialGradient()
         self.l1loss = L1Loss()
 
     def forward(self, img1, img2):
         return self.l1loss( self.gradient_fun(img1), self.gradient_fun(img2) )
+
+
+class GradientL2Loss(nn.Module):
+    def __init__(self):
+        super(GradientL2Loss, self).__init__()
+        self.gradient_fun = kornia.filters.SpatialGradient()
+        self.l2loss = L2Loss()
+
+    def forward(self, img1, img2):
+        return self.l2loss( self.gradient_fun(img1), self.gradient_fun(img2) )
+
+
+
+class AdaptiveGradientL2Loss(nn.Module):
+    def __init__(self):
+        super(AdaptiveGradientL2Loss, self).__init__()
+        self.gradient_fun = kornia.filters.SpatialGradient()
+        self.l2loss = L2Loss()
+
+    def forward(self, img1, img2):
+
+        img1_grad_lowpass = self.gradient_fun(low_pass(img1))
+        img2_grad_lowpass = self.gradient_fun(low_pass(img2))
+
+        img1_score = torch.sign(img1_grad_lowpass - torch.minimum(img1_grad_lowpass, img2_grad_lowpass))
+        img2_score = 1 - img1_score
+
+        return img2_score*self.l2loss( self.gradient_fun(img1), self.gradient_fun(img2) )

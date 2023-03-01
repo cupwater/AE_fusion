@@ -1,7 +1,7 @@
 '''
 Author: Peng Bo
 Date: 2023-02-02 08:25:04
-LastEditTime: 2023-02-27 17:16:33
+LastEditTime: 2023-03-01 15:16:35
 Description: 
 
 '''
@@ -25,9 +25,10 @@ class ConvBlock(nn.Module):
     def forward(self, x):
         return self.conv(x)
 
-class FeatBlock(nn.Module):
+
+class DenseBlock(nn.Module):
     def __init__(self, in_channels=3, mid_channels=16):
-        super(FeatBlock, self).__init__()
+        super(DenseBlock, self).__init__()
         self.conv1 = ConvBlock(in_channels,  mid_channels)
         self.conv2 = ConvBlock(mid_channels, mid_channels)
         self.conv3 = ConvBlock(mid_channels, mid_channels)
@@ -41,18 +42,61 @@ class FeatBlock(nn.Module):
         return torch.cat((x1, x2, x3, x4), 1)
 
 
-class SqueezeNet(nn.Module):
-    def __init__(self, vis_channels=3, ir_channels=1, out_channels=3, mid_channels=16):
-        super(SqueezeNet, self).__init__()
-        self.vis_feat_net = FeatBlock(vis_channels, mid_channels)
-        self.ir_feat_net  = FeatBlock(ir_channels,  mid_channels)
-        self.fuse_layer = nn.Sequential(
-            nn.Conv2d(8*mid_channels, out_channels),
+class DisassembleBlock(nn.Module):
+    def __init__(self, in_channels=3, mid_channels=16, out_channels=3):
+        super(DisassembleBlock, self).__init__()
+        self.conv1 = ConvBlock(in_channels,  mid_channels)
+        self.conv2 = ConvBlock(mid_channels, mid_channels)
+        self.dec_layer = nn.Sequential(
+            nn.Conv2d(mid_channels, out_channels, padding=1),
             nn.Tanh()
         )
 
-    def forward(self, vis_input, ir_input):  
-        vis_feat = self.vis_feat_net(vis_input)
-        ir_feat  = self.ir_feat_net(ir_input)
+    def forward(self, x):  
+        x1 = self.conv1(x)
+        x2 = self.conv2(x1)
+        out = self.dec_layer(x2)
+        return out
+
+
+class SqueezeNet(nn.Module):
+    def __init__(self, vis_channels=3, ir_channels=1, out_channels=3, mid_channels=16):
+        super(SqueezeNet, self).__init__()
+        self.vis_branch = DenseBlock(vis_channels, mid_channels)
+        self.ir_branch  = DenseBlock(ir_channels,  mid_channels)
+        self.fuse_layer = nn.Sequential(
+            nn.Conv2d(8*mid_channels, out_channels, padding=1),
+            nn.Tanh()
+        )
+
+    def forward(self, vis_in, ir_in):  
+        vis_feat = self.vis_branch(vis_in)
+        ir_feat  = self.ir_branch(ir_in)
         fused_out = self.fuse_layer(torch.cat((vis_feat, ir_feat), 1))
         return fused_out
+
+
+class DecomposeNet(nn.Module):
+    def __init__(self, in_channels=3, mid_channels=16, vis_channels=3, ir_channels=1):
+        super(DecomposeNet, self).__init__()
+        self.extract_layer = ConvBlock(in_channels, mid_channels)
+        self.vis_branch = DisassembleBlock(in_channels, mid_channels, 3)
+        self.ir_branch  = DisassembleBlock(in_channels, mid_channels, 1)
+
+    def forward(self, x):  
+        mid_feat = self.extract_layer(x)
+        vis_out = self.vis_branch(mid_feat)
+        ir_out  = self.ir_branch(mid_feat)
+        return vis_out, ir_out
+    
+
+class SDNet(nn.Module):
+    def __init__(self, fuse_channels=3, mid_channels=16, vis_channels=3, ir_channels=1):
+        super(SDNet, self).__init__()
+        self.squeeze   = SqueezeNet(vis_channels, ir_channels, fuse_channels, mid_channels)
+        self.decompose = DecomposeNet(fuse_channels, mid_channels, vis_channels, ir_channels)
+
+    def forward(self, vis_in, ir_in):  
+        fused_img       = self.squeeze(vis_in, ir_in)
+        vis_out, ir_out = self.decompose(fused_img)
+        return fused_img, vis_out, ir_out

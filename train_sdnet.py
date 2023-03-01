@@ -13,14 +13,16 @@ import torch
 import torch.onnx
 import numpy as np
 from skimage.io import imsave
+import kornia
 
 import pdb
 
 import models
 import dataset
 import losses
+from torch.nn import functional as F
 from augmentation.augment import TrainTransform, TestTransform
-from utils import Logger, AverageMeter, mkdir_p, progress_bar
+from utils import low_pass, Logger, AverageMeter, mkdir_p, progress_bar
 
 state = {}
 best_loss = 999
@@ -74,14 +76,7 @@ def main(config_file, is_eval):
         model = model.cuda()
     torch.backends.cudnn.benchmark = True
 
-    # get all the loss functions into criterion_list
     # optimizer and scheduler
-    criterion_list = []
-    for loss_key, loss_dict in config['loss_config'].items():
-        criterion = losses.__dict__[loss_dict['type']]()
-        weight = loss_dict['weight']
-        criterion_list.append([criterion, weight, loss_key])
-
     optimizer = torch.optim.SGD(
         filter(
             lambda p: p.requires_grad,
@@ -92,13 +87,11 @@ def main(config_file, is_eval):
 
     # logger
     logger = Logger(os.path.join(common_config['save_path'], 'log.txt'))
-    logger.set_names(['Learning Rate', 'bg_diff', 'detail_diff',
-                     'vis_rec', 'ir_rec', 'vis_gradient', 'loss'])
+    logger.set_names(['Learning Rate', 'intensitiy', 'reconstruct', 'gradient', 'loss'])
 
     if is_eval:
         model.load_state_dict(torch.load(os.path.join(
             common_config['save_path'], 'checkpoint.pth.tar'))['state_dict'], strict=True)
-        test(testloader, model, criterion_list, use_cuda)
         return
 
     # Train and val
@@ -106,116 +99,73 @@ def main(config_file, is_eval):
         adjust_learning_rate(optimizer, epoch, common_config)
         print('\nEpoch: [%d | %d] LR: %f' %
               (epoch + 1, common_config['epoch'], state['lr']))
-        bg_diff, detail_diff, vis_rec, ir_rec, vis_gradient, loss = \
-                            train(trainloader, model, criterion_list, optimizer, \
+        intensitiy, reconstruct, gradient, loss = \
+                            train(trainloader, model, optimizer, \
                                   use_cuda, epoch, common_config['print_interval'])
         # append logger file
-        logger.append([state['lr'], bg_diff, detail_diff,
-                      vis_rec, ir_rec, vis_gradient, loss])
+        logger.append([state['lr'], intensitiy, reconstruct, gradient, loss])
         best_loss = min(loss, best_loss)
         save_checkpoint({
             'epoch': epoch + 1,
             'state_dict': model.state_dict(),
         }, loss < best_loss, save_path=common_config['save_path'])
 
-    test(testloader, model, criterion_list, use_cuda)
     logger.close()
 
 
-def train(trainloader, model, criterion_list, optimizer, use_cuda, epoch, print_interval=100):
+def train(trainloader, model, optimizer, use_cuda, epoch, print_interval=100):
     # switch to train mode
     model.train()
 
     batch_time = AverageMeter()
     data_time = AverageMeter()
-    losses = AverageMeter()
 
-    bg_diff = AverageMeter()
-    detail_diff = AverageMeter()
-    vis_rec = AverageMeter()
-    ir_rec = AverageMeter()
-    vis_gradient = AverageMeter()
+    losses = AverageMeter()
+    losses_intensity = AverageMeter()
+    losses_reconstruct = AverageMeter()
+    losses_gradient = AverageMeter()
 
     end = time.time()
 
+    criterion_AdapGradLoss = losses['AdaptiveGradientLoss']()
     model.train()
-    for batch_idx, (vis_input, ir_input) in enumerate(trainloader):
+    for batch_idx, (vis_in, ir_in) in enumerate(trainloader):
         # measure data loading time
         data_time.update(time.time() - end)
         if use_cuda:
-            vis_input, ir_input = vis_input.cuda(), ir_input.cuda()
-        out_vis, vis_feat_bg, vis_feat_detail, out_ir, \
-            ir_feat_bg, ir_feat_detail = model(vis_input, ir_input)
+            vis_in, ir_in = vis_in.cuda(), ir_in.cuda()
 
-        all_loss = 0
-        for loss_fun, weight, loss_key in criterion_list:
-            if loss_key == 'bg_dif':
-                temp_loss = weight * \
-                    torch.tanh(loss_fun(ir_feat_bg, vis_feat_bg))
-                bg_diff.update(temp_loss.item(), vis_input.size(0))
-            elif loss_key == 'detail_dif':
-                temp_loss = weight * \
-                    torch.tanh(loss_fun(ir_feat_detail, vis_feat_detail))
-                detail_diff.update(temp_loss)
-            elif loss_key == 'vis_rec':
-                temp_loss = weight * loss_fun(out_vis, vis_input)
-                vis_rec.update(temp_loss)
-            elif loss_key == 'ir_rec':
-                temp_loss = weight * loss_fun(out_ir, ir_input)
-                ir_rec.update(temp_loss)
-            elif loss_key == 'vis_gradient':
-                temp_loss = weight * loss_fun(vis_input, out_vis)
-                vis_gradient.update(temp_loss)
-            else:
-                print("error, no such loss")
-            all_loss += temp_loss
+        fused_img, vis_out, ir_out = model(vis_in, ir_in)
 
-        losses.update(all_loss.item(), vis_input.size(0))
+        loss_intensity = F.mse_loss(fused_img, vis_in, reduction='mean') + \
+                    0.5*F.mse_loss(fused_img, ir_in, reduction='mean')
+        loss_reconstruct = F.mse_loss(vis_out, vis_in, reduction='mean') + \
+                    F.mse_loss(ir_out, ir_in, reduction='mean')
+        loss_gradient = criterion_AdapGradLoss(fused_img, vis_in) + \
+                    criterion_AdapGradLoss(fused_img, ir_in)
+        all_loss = loss_intensity + 80 * loss_gradient + loss_reconstruct
+
+        losses_intensity.append(loss_intensity, vis_in.size(0)) 
+        losses_reconstruct.append(loss_reconstruct, vis_in.size(0)) 
+        losses_gradient.append(loss_gradient, vis_in.size(0)) 
+        losses.update(all_loss.item(), vis_in.size(0))
+
         # compute gradient and do SGD step
         optimizer.zero_grad()
         all_loss.backward()
         optimizer.step()
 
         if batch_idx % print_interval == 0:
-            print("iter/epoch: %d / %d \t bg_dif: %.3f \t detail_dif: %.3f, \
-                    vis_rec: %.3f \t ir_rec: %.3f \t vis_gradient: %.3f \t losses: %.3f" % (
-                batch_idx, epoch, bg_diff.avg, detail_diff.avg,
-                vis_rec.avg, ir_rec.avg, vis_gradient.avg, losses.avg))
+            print("iter/epoch: %d / %d \t loss_intensity: %.3f \t loss_reconstruct: %.3f, \
+                    loss_gradient: %.3f \t losses: %.3f" % (
+                batch_idx, epoch, losses_intensity.avg, losses_reconstruct.avg,
+                losses_gradient.avg, losses.avg))
 
         # progress_bar(batch_idx, len(trainloader), 'Loss: %.2f ' % (losses.avg))
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
-    return (bg_diff.avg, detail_diff.avg, vis_rec.avg,
-            ir_rec.avg, vis_gradient.avg, losses.avg)
-
-
-def test(testloader, model, criterion, use_cuda):
-    global best_loss
-    # switch to evaluate mode
-    model.eval()
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
-    losses = AverageMeter()
-    end = time.time()
-
-    model.eval()
-    for batch_idx, (vis_input, ir_input) in enumerate(testloader):
-        # measure data loading time
-        data_time.update(time.time() - end)
-        if use_cuda:
-            vis_input, ir_input = vis_input.cuda(), ir_input.cuda()
-
-        fuse_out = model(vis_input, ir_input).cpu().detach().numpy()
-        for idx in range(fuse_out.shape[0]):
-            img = np.transpose(fuse_out[idx], (1, 2, 0))
-            imsave(f"data/fusion/test_results/{batch_idx}_{idx}.jpg", img)
-
-        progress_bar(batch_idx, len(testloader))
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
-    return (losses.avg)
+    return (losses_intensity.avg, losses_reconstruct.avg, losses_gradient.avg, losses.avg)
 
 
 def save_checkpoint(state, is_best, save_path, filename='checkpoint.pth.tar'):
