@@ -1,7 +1,7 @@
 '''
 Author: Pengbo
 Date: 2022-02-23 15:42:01
-LastEditTime: 2023-02-02 11:24:26
+LastEditTime: 2023-03-01 08:31:15
 Description: 
 
 '''
@@ -35,10 +35,11 @@ class VisibleInfraredPairDataset (Dataset):
             result = self.transform(image=rgb, mask=ir)
             rgb, ir = result['image'], result['mask']
         rgb = rgb.transpose((2,0,1))
-        ir  = np.expand_dims(ir, axis=2).transpose((2,0,1))
+        ir  = np.tile(np.expand_dims(ir, axis=2), (1,1,3))
+        ir  = ir.transpose((2,0,1))
         rgb, ir = torch.FloatTensor(rgb), torch.FloatTensor(ir)
         rgb, ir = rgb / 255.0, ir / 255.0
-        return rgb[0:1,:,:], ir
+        return rgb, ir
 
     def __len__(self):
         return len(self.imgs_list)
@@ -69,4 +70,6 @@ if __name__ == "__main__":
     trainset = VisibleInfraredPairDataset('./data/train_list.txt', transform_train, 
         prefix="./data/train_vis_ir_images")
     
-    trainset.__getitem__(1)
+    rgb, ir = trainset.__getitem__(1)
+    import pdb
+    pdb.set_trace()

@@ -1,7 +1,7 @@
 '''
 Author: Peng Bo
 Date: 2023-02-02 08:25:04
-LastEditTime: 2023-02-27 17:12:55
+LastEditTime: 2023-03-01 08:26:55
 Description: 
 
 '''
@@ -37,7 +37,7 @@ class Encoder(nn.Module):
     def __init__(self):
         super(Encoder, self).__init__()
         #self.conv1 = ConvBlock(1, 16, is_reflect=True, act_fun=nn.PReLU, padding=1)
-        self.conv1 = ConvBlock(1,  16, act_fun=nn.PReLU, padding=1)
+        self.conv1 = ConvBlock(3,  16, act_fun=nn.PReLU, padding=1)
         self.conv2 = ConvBlock(16, 16, act_fun=nn.PReLU, padding=1)
         self.conv3 = ConvBlock(16, 16, act_fun=nn.Tanh, padding=1)
         self.conv4 = ConvBlock(16, 16, act_fun=nn.Tanh, padding=1)
@@ -55,7 +55,7 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.conv1 = ConvBlock(32, 16, act_fun=nn.PReLU, padding=1)
         self.conv2 = ConvBlock(32, 16, act_fun=nn.PReLU, padding=1)
-        self.conv3 = ConvBlock(32, 1,  act_fun=nn.Sigmoid, padding=1)
+        self.conv3 = ConvBlock(32, 3,  act_fun=nn.Sigmoid, padding=1)
 
     def forward(self, feat1, feat2, featB, featD):
         out = self.conv1(torch.cat([featB, featD], 1))
