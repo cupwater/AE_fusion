@@ -32,13 +32,14 @@ class YCrCbInfraredPairDataset (Dataset):
         rgb = cv2.imread(rgb_path)
         YCrCb = cv2.cvtColor(rgb, cv2.COLOR_BGR2YCR_CB)
         ir  = cv2.imread(ir_path, cv2.IMREAD_GRAYSCALE)
+        ir = ir / 255.0
         if self.transform != None:
             result = self.transform(image=YCrCb, mask=ir)
             YCrCb, ir = result['image'], result['mask']
         YCrCb = YCrCb.transpose((2,0,1))
         ir  = np.expand_dims(ir, axis=2).transpose((2,0,1))
         YCrCb, ir = torch.FloatTensor(YCrCb), torch.FloatTensor(ir)
-        YCrCb, ir = YCrCb / 1.0, ir / 255.0
+        #YCrCb, ir = YCrCb / 255.0, ir / 255.0
         Yc, Crc, Cbc = YCrCb[0:1], YCrCb[1:2], YCrCb[2:3]
         return Yc, ir, Crc, Cbc
 
@@ -56,14 +57,16 @@ if __name__ == "__main__":
             A.RandomCrop(width=crop_size, height=crop_size),
             A.HorizontalFlip(p=0.5),
             A.RandomBrightnessContrast(p=0.2),
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+            A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+            #A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
         ])
 
     def TestTransform(final_size=256, crop_size=224):
         return A.Compose([
             A.Resize(final_size, final_size),
             A.CenterCrop(width=crop_size, height=crop_size),
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+            A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+            #A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
         ])
 
     transform_train = TrainTransform(crop_size=110, final_size=128)

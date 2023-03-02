@@ -4,7 +4,7 @@ Copyright (c) Pengbo, 2021
 '''
 from __future__ import print_function
 
-
+import cv2
 import os
 import shutil
 import time
@@ -63,7 +63,7 @@ def main(config_file, is_eval):
 
     # create dataloader for training and testing
     trainloader = torch.utils.data.DataLoader(
-        trainset, batch_size=common_config['train_batch'], shuffle=True, num_workers=5)
+        trainset, batch_size=common_config['train_batch'], shuffle=True, num_workers=10)
     testloader = torch.utils.data.DataLoader(
         testset, batch_size=common_config['test_batch'], shuffle=False, num_workers=5)
 
@@ -90,12 +90,13 @@ def main(config_file, is_eval):
     logger.set_names(['Learning Rate', 'intensitiy', 'reconstruct', 'gradient', 'loss'])
 
     if is_eval:
+        model = torch.nn.DataParallel(model, device_ids=[0,1,2])
         model.load_state_dict(torch.load(os.path.join(
             common_config['save_path'], 'checkpoint.pth.tar'))['state_dict'], strict=True)
         test(testloader, model, use_cuda)
         return
 
-    model = torch.nn.DataParallel(model, device_ids=[0,1,2])
+    #model = torch.nn.DataParallel(model, device_ids=[0,1,2])
 
     # Train and val
     for epoch in range(common_config['epoch']):
@@ -183,12 +184,13 @@ def test(testloader, model, use_cuda):
         data_time.update(time.time() - end)
         if use_cuda:
             vis_in, ir_in = vis_in.cuda(), ir_in.cuda()
-        fused_img, _, _ = model(vis_in, ir_in)
-        fused_img = fused_img.detach().cpu().numpy()
-        YCrCb = torch.cat((fused_img, Cr, Cb), dim=1)
+        fuse_out, vis_out, ir_out = model(vis_in, ir_in)
+        YCrCb = torch.cat((fuse_out.cpu(), Cr, Cb), dim=1)
+        fused_img = YCrCb.detach().numpy() * 255.0
         for idx in range(fused_img.shape[0]):
-            img = np.transpose(YCrCb[idx], (1, 2, 0))
-            imsave(f"data/fusion/test_results/{batch_idx}_{idx}.jpg", img)
+            img = np.transpose(fused_img[idx].astype(np.uint8), (1, 2, 0))
+            cv2.imwrite(f"data/fusion/test_results/{batch_idx}_{idx}.jpg", img)
+            #imsave(f"data/fusion/test_results/{batch_idx}_{idx}.jpg", img)
         progress_bar(batch_idx, len(testloader))
         # measure elapsed time
         batch_time.update(time.time() - end)
