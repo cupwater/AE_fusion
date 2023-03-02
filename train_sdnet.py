@@ -92,6 +92,7 @@ def main(config_file, is_eval):
     if is_eval:
         model.load_state_dict(torch.load(os.path.join(
             common_config['save_path'], 'checkpoint.pth.tar'))['state_dict'], strict=True)
+        test(testloader, model, use_cuda)
         return
 
     model = torch.nn.DataParallel(model, device_ids=[0,1,2])
@@ -112,6 +113,7 @@ def main(config_file, is_eval):
             'state_dict': model.state_dict(),
         }, loss < best_loss, save_path=common_config['save_path'])
 
+    test(testloader, model, use_cuda)
     logger.close()
 
 
@@ -150,7 +152,6 @@ def train(trainloader, model, optimizer, use_cuda, epoch, print_interval=100):
         losses_intensity.update(loss_intensity, vis_in.size(0)) 
         losses_reconstruct.update(loss_reconstruct, vis_in.size(0)) 
         losses_gradient.update(loss_gradient, vis_in.size(0)) 
-        pdb.set_trace()
         losses.update(all_loss.item(), vis_in.size(0))
 
         # compute gradient and do SGD step
@@ -184,9 +185,10 @@ def test(testloader, model, use_cuda):
         if use_cuda:
             vis_in, ir_in = vis_in.cuda(), ir_in.cuda()
         fused_img, _, _ = model(vis_in, ir_in)
+        fused_img = fused_img.detach().cpu().numpy()
         for idx in range(fused_img.shape[0]):
-            img = np.transpose(fused_img, (1, 2, 0))
-            imsave(f"data/fusion/test_results/{batch_idx}_{idx}.jpg", img)
+            img = np.transpose(fused_img[idx], (1, 2, 0))
+            imsave(f"data/fusion/sdnet_results/{batch_idx}_{idx}.jpg", img)
         progress_bar(batch_idx, len(testloader))
         # measure elapsed time
         batch_time.update(time.time() - end)
