@@ -37,9 +37,9 @@ class YCrCbInfraredPairDataset (Dataset):
             result = self.transform(image=YCrCb, mask=ir)
             YCrCb, ir = result['image'], result['mask']
         YCrCb = YCrCb.transpose((2,0,1))
+        ir = (ir - 0.5) / 0.5
         ir  = np.expand_dims(ir, axis=2).transpose((2,0,1))
         YCrCb, ir = torch.FloatTensor(YCrCb), torch.FloatTensor(ir)
-        #YCrCb, ir = YCrCb / 255.0, ir / 255.0
         Yc, Crc, Cbc = YCrCb[0:1], YCrCb[1:2], YCrCb[2:3]
         return Yc, ir, Crc, Cbc
 
@@ -56,7 +56,7 @@ if __name__ == "__main__":
             A.ShiftScaleRotate(shift_limit=0.02, scale_limit=0.05, rotate_limit=15),
             A.RandomCrop(width=crop_size, height=crop_size),
             A.HorizontalFlip(p=0.5),
-            A.RandomBrightnessContrast(p=0.2),
+            A.RandomBrightnessContrast(p=0.1),
             A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
             #A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
         ])

@@ -13,7 +13,7 @@ def TrainTransform(crop_size=224, final_size=256):
         A.Resize(final_size, final_size),
         A.ShiftScaleRotate(shift_limit=0.02, scale_limit=0.05, rotate_limit=15),
         A.HorizontalFlip(p=0.5),
-        A.RandomBrightnessContrast(p=0.2),
+        A.RandomBrightnessContrast(p=0.1),
         A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
         #A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
     ])
