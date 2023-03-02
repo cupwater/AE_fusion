@@ -133,14 +133,13 @@ def train(trainloader, model, optimizer, use_cuda, epoch, print_interval=100):
 
     criterion_AdapGradLoss = AdaptiveGradientL2Loss()
     model.train()
-    for batch_idx, (vis_in, ir_in) in enumerate(trainloader):
+    for batch_idx, (vis_in, ir_in, Cr, Cb) in enumerate(trainloader):
         # measure data loading time
         data_time.update(time.time() - end)
         if use_cuda:
             vis_in, ir_in = vis_in.cuda(), ir_in.cuda()
 
         fused_img, vis_out, ir_out = model(vis_in, ir_in)
-
         loss_intensity = F.mse_loss(fused_img, vis_in, reduction='mean') + \
                     0.5*F.mse_loss(fused_img, ir_in, reduction='mean')
         loss_reconstruct = F.mse_loss(vis_out, vis_in, reduction='mean') + \
@@ -179,16 +178,17 @@ def test(testloader, model, use_cuda):
     data_time = AverageMeter()
     end = time.time()
     model.eval()
-    for batch_idx, (vis_in, ir_in) in enumerate(testloader):
+    for batch_idx, (vis_in, ir_in, Cr, Cb) in enumerate(testloader):
         # measure data loading time
         data_time.update(time.time() - end)
         if use_cuda:
             vis_in, ir_in = vis_in.cuda(), ir_in.cuda()
         fused_img, _, _ = model(vis_in, ir_in)
         fused_img = fused_img.detach().cpu().numpy()
+        YCrCb = torch.cat((fused_img, Cr, Cb), dim=1)
         for idx in range(fused_img.shape[0]):
-            img = np.transpose(fused_img[idx], (1, 2, 0))
-            imsave(f"data/fusion/sdnet_results/{batch_idx}_{idx}.jpg", img)
+            img = np.transpose(YCrCb[idx], (1, 2, 0))
+            imsave(f"data/fusion/test_results/{batch_idx}_{idx}.jpg", img)
         progress_bar(batch_idx, len(testloader))
         # measure elapsed time
         batch_time.update(time.time() - end)

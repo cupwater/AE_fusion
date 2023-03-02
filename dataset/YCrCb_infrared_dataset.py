@@ -1,7 +1,7 @@
 '''
 Author: Pengbo
 Date: 2022-02-23 15:42:01
-LastEditTime: 2023-02-02 11:24:26
+LastEditTime: 2023-03-02 08:50:22
 Description: 
 
 '''
@@ -13,9 +13,9 @@ import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset
 
-__all__ = ['RGBT210Fusion']
+__all__ = ['YCrCbInfraredPairDataset']
 
-class RGBT210Fusion (Dataset):
+class YCrCbInfraredPairDataset (Dataset):
 
     # --------------------------------------------------------------------------------
     def __init__(self, imgs_list, transform, prefix='data/'):
@@ -30,15 +30,17 @@ class RGBT210Fusion (Dataset):
         rgb_path, ir_path = os.path.join(self.prefix, p1.strip()), os.path.join(self.prefix, p2.strip())
 
         rgb = cv2.imread(rgb_path)
+        YCrCb = cv2.cvtColor(rgb, cv2.COLOR_BGR2YCR_CB)
         ir  = cv2.imread(ir_path, cv2.IMREAD_GRAYSCALE)
         if self.transform != None:
-            result = self.transform(image=rgb, mask=ir)
-            rgb, ir = result['image'], result['mask']
-        rgb = rgb.transpose((2,0,1))
+            result = self.transform(image=YCrCb, mask=ir)
+            YCrCb, ir = result['image'], result['mask']
+        YCrCb = YCrCb.transpose((2,0,1))
         ir  = np.expand_dims(ir, axis=2).transpose((2,0,1))
-        rgb, ir = torch.FloatTensor(rgb), torch.FloatTensor(ir)
-        rgb, ir = rgb / 255.0, ir / 255.0
-        return rgb, ir
+        YCrCb, ir = torch.FloatTensor(YCrCb), torch.FloatTensor(ir)
+        YCrCb, ir = YCrCb / 1.0, ir / 255.0
+        Yc, Crc, Cbc = YCrCb[0:1], YCrCb[1:2], YCrCb[2:3]
+        return Yc, ir, Crc, Cbc
 
     def __len__(self):
         return len(self.imgs_list)
@@ -66,7 +68,7 @@ if __name__ == "__main__":
 
     transform_train = TrainTransform(crop_size=110, final_size=128)
     transform_test  = TestTransform(crop_size=110, final_size=128)
-    trainset = VisibleInfraredPairDataset('./data/train_list.txt', transform_train, 
+    trainset = YCrCbInfraredPairDataset('./data/train_list.txt', transform_train, 
         prefix="./data/train_vis_ir_images")
-    
-    trainset.__getitem__(1)
+    Yc, ir, Crc, Cbc = trainset.__getitem__(1)
+    pdb.set_trace()
