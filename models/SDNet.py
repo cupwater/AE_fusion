@@ -1,7 +1,7 @@
 '''
 Author: Peng Bo
 Date: 2023-02-02 08:25:04
-LastEditTime: 2023-03-01 15:16:35
+LastEditTime: 2023-03-02 08:53:54
 Description: 
 
 '''
@@ -34,7 +34,7 @@ class ConvBlock(nn.Module):
 
 
 class DenseBlock(nn.Module):
-    def __init__(self, in_channels=3, mid_channels=16):
+    def __init__(self, in_channels=1, mid_channels=16):
         super(DenseBlock, self).__init__()
         self.conv1 = ConvBlock(in_channels,  mid_channels)
         self.conv2 = ConvBlock(mid_channels, mid_channels)
@@ -50,7 +50,7 @@ class DenseBlock(nn.Module):
 
 
 class DisassembleBlock(nn.Module):
-    def __init__(self, in_channels=3, mid_channels=16, out_channels=3):
+    def __init__(self, in_channels=1, mid_channels=16, out_channels=1):
         super(DisassembleBlock, self).__init__()
         self.conv1 = ConvBlock(in_channels,  mid_channels)
         self.conv2 = ConvBlock(mid_channels, mid_channels)
@@ -67,7 +67,7 @@ class DisassembleBlock(nn.Module):
 
 
 class SqueezeNet(nn.Module):
-    def __init__(self, vis_channels=3, ir_channels=3, out_channels=3, mid_channels=16):
+    def __init__(self, vis_channels=1, ir_channels=1, out_channels=1, mid_channels=16):
         super(SqueezeNet, self).__init__()
         self.vis_branch = DenseBlock(vis_channels, mid_channels)
         self.ir_branch  = DenseBlock(ir_channels,  mid_channels)
@@ -84,7 +84,7 @@ class SqueezeNet(nn.Module):
 
 
 class DecomposeNet(nn.Module):
-    def __init__(self, in_channels=3, mid_channels=16, vis_channels=3, ir_channels=3):
+    def __init__(self, in_channels=1, mid_channels=16, vis_channels=1, ir_channels=1):
         super(DecomposeNet, self).__init__()
         self.extract_layer = ConvBlock(in_channels, mid_channels)
         self.vis_branch = DisassembleBlock(mid_channels, mid_channels, vis_channels)
@@ -98,7 +98,7 @@ class DecomposeNet(nn.Module):
     
 
 class SDNet(nn.Module):
-    def __init__(self, fuse_channels=3, mid_channels=16, vis_channels=3, ir_channels=3):
+    def __init__(self, fuse_channels=1, mid_channels=16, vis_channels=1, ir_channels=1):
         super(SDNet, self).__init__()
         self.squeeze   = SqueezeNet(vis_channels, ir_channels, fuse_channels, mid_channels)
         self.decompose = DecomposeNet(fuse_channels, mid_channels, vis_channels, ir_channels)
