@@ -1,6 +1,6 @@
 import tensorflow as tf
 import torch.nn.functional as F
-
+from losses.loss import AdaptiveGradientL2Loss
 
 def gradient(input):
     filter = tf.reshape(tf.constant(
@@ -42,10 +42,14 @@ g_loss_sept = tf.reduce_mean(tf.square(sept_ir - images_ir)) + \
 g_loss_2 = g_loss_int+80*g_loss_grad+1*g_loss_sept
 
 
-loss_intensity = F.mse_loss(fused_img, vis_in, reduction='mean') + \
-            0.5*F.mse_loss(fused_img, ir_in, reduction='mean')
-loss_reconstruct = F.mse_loss(vis_out, vis_in, reduction='mean') + \
-            F.mse_loss(ir_out, ir_in, reduction='mean')
+import pdb
+pdb.set_trace()
+criterion_AdapGradLoss = AdaptiveGradientL2Loss()
 
-loss_gradient = criterion_AdapGradLoss(fused_img, vis_in, ir_in)
+loss_intensity = F.mse_loss(fusion_image, images_vi, reduction='mean') + \
+            0.5*F.mse_loss(fusion_image, images_ir, reduction='mean')
+loss_reconstruct = F.mse_loss(sept_vi, images_vi, reduction='mean') + \
+            F.mse_loss(sept_ir, images_ir, reduction='mean')
+
+loss_gradient = criterion_AdapGradLoss(fusion_image, images_vi, images_ir)
 all_loss = loss_intensity + 80 * loss_gradient + loss_reconstruct
