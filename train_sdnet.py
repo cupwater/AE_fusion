@@ -45,8 +45,9 @@ def main(config_file, is_eval):
     data_config = config['dataset']
     transform_train = TrainTransform(
         crop_size=data_config['crop_size'], final_size=data_config['final_size'])
-    transform_test = TestTransform(
-        crop_size=data_config['crop_size'], final_size=data_config['final_size'])
+    transform_test = TestTransform()
+    #transform_test = TestTransform(
+    #    crop_size=data_config['crop_size'], final_size=data_config['final_size'])
 
     print('==> Preparing dataset %s' % data_config['type'])
 
@@ -55,7 +56,7 @@ def main(config_file, is_eval):
         data_config['train_list'], transform_train,
         prefix=data_config['prefix'])
     testset = dataset.__dict__[data_config['type']](
-        data_config['test_list'], transform=None,
+        data_config['test_list'], transform=transform_test,
         prefix=data_config['prefix'])
     # testset = dataset.__dict__[data_config['type']](
     #     data_config['test_list'], transform_test,
@@ -90,7 +91,7 @@ def main(config_file, is_eval):
     logger.set_names(['Learning Rate', 'intensitiy', 'reconstruct', 'gradient', 'loss'])
 
     if is_eval:
-        model = torch.nn.DataParallel(model, device_ids=[0,1,2])
+        #model = torch.nn.DataParallel(model, device_ids=[1,2])
         model.load_state_dict(torch.load(os.path.join(
             common_config['save_path'], 'checkpoint.pth.tar'))['state_dict'], strict=True)
         test(testloader, model, use_cuda)
@@ -105,20 +106,18 @@ def main(config_file, is_eval):
               (epoch + 1, common_config['epoch'], state['lr']))
         intensitiy, reconstruct, gradient, loss = \
                             train(trainloader, model, optimizer, \
-                                  use_cuda, epoch, common_config['print_interval'])
-        # append logger file
-        logger.append([state['lr'], intensitiy, reconstruct, gradient, loss])
+                                  use_cuda, epoch, logger, common_config['print_interval'])
         best_loss = min(loss, best_loss)
         save_checkpoint({
             'epoch': epoch + 1,
             'state_dict': model.state_dict(),
         }, loss < best_loss, save_path=common_config['save_path'])
 
-    test(testloader, model, use_cuda)
+        test(testloader, model, use_cuda)
     logger.close()
 
 
-def train(trainloader, model, optimizer, use_cuda, epoch, print_interval=100):
+def train(trainloader, model, optimizer, use_cuda, epoch, logger, print_interval=100):
     # switch to train mode
     model.train()
 
@@ -141,8 +140,8 @@ def train(trainloader, model, optimizer, use_cuda, epoch, print_interval=100):
             vis_in, ir_in = vis_in.cuda(), ir_in.cuda()
 
         fused_img, vis_out, ir_out = model(vis_in, ir_in)
-        loss_intensity = F.mse_loss(fused_img, vis_in, reduction='mean') + \
-                    0.5*F.mse_loss(fused_img, ir_in, reduction='mean')
+        loss_intensity = 0.5*F.mse_loss(fused_img, vis_in, reduction='mean') + \
+                    F.mse_loss(fused_img, ir_in, reduction='mean')
         loss_reconstruct = F.mse_loss(vis_out, vis_in, reduction='mean') + \
                     F.mse_loss(ir_out, ir_in, reduction='mean')
 
@@ -164,6 +163,8 @@ def train(trainloader, model, optimizer, use_cuda, epoch, print_interval=100):
                     loss_gradient: %.3f \t losses: %.3f" % (
                 batch_idx, epoch, losses_intensity.avg, losses_reconstruct.avg,
                 losses_gradient.avg, losses.avg))
+            logger.append([state['lr'], losses_intensity.avg, losses_reconstruct.avg, \
+                        losses_gradient.avg, losses.avg])
 
         # progress_bar(batch_idx, len(trainloader), 'Loss: %.2f ' % (losses.avg))
         # measure elapsed time
@@ -186,10 +187,13 @@ def test(testloader, model, use_cuda):
             vis_in, ir_in = vis_in.cuda(), ir_in.cuda()
         fuse_out, vis_out, ir_out = model(vis_in, ir_in)
         YCrCb = torch.cat((fuse_out.cpu(), Cr, Cb), dim=1)
-        fused_img = YCrCb.detach().numpy() * 255.0
+        fused_img = YCrCb.detach().numpy() * 127.5 + 127.5
+        fused_img[fused_img>255] = 255
+        fused_img[fused_img<0] = 0
         for idx in range(fused_img.shape[0]):
             img = np.transpose(fused_img[idx].astype(np.uint8), (1, 2, 0))
-            cv2.imwrite(f"data/fusion/test_results/{batch_idx}_{idx}.jpg", img)
+            img = cv2.cvtColor(img, cv2.COLOR_YCR_CB2BGR)
+            cv2.imwrite(f"data/fusion/sdnet_results/{batch_idx}_{idx}.jpg", img)
             #imsave(f"data/fusion/test_results/{batch_idx}_{idx}.jpg", img)
         progress_bar(batch_idx, len(testloader))
         # measure elapsed time

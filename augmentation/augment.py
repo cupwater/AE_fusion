@@ -18,13 +18,19 @@ def TrainTransform(crop_size=224, final_size=256):
         #A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
     ])
 
-def TestTransform(crop_size=224, final_size=256):
-    return A.Compose([
-        A.CenterCrop(width=crop_size, height=crop_size),
-        A.Resize(final_size, final_size),
-        A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
-        #A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
-    ])
+def TestTransform(crop_size=None, final_size=None):
+    if crop_size is None:
+        return A.Compose([
+            A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+            #A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+        ])
+    else:
+        return A.Compose([
+            A.CenterCrop(width=crop_size, height=crop_size),
+            A.Resize(final_size, final_size),
+            A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+            #A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+        ])
 
 
 if __name__ == "__main__":
