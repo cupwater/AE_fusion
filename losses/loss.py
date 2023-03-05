@@ -160,8 +160,8 @@ class AdaptiveGradientL2Loss(nn.Module):
         #ir         = torch.mean(ir, dim=1, keepdim=True)
         #fused_img  = torch.mean(fused_img, dim=1, keepdim=True)
 
-        vis_grad_lowpass = gradient(low_pass(vis))
-        ir_grad_lowpass  = gradient(low_pass(ir))
+        vis_grad_lowpass = torch.abs(gradient(low_pass(vis)))
+        ir_grad_lowpass  = torch.abs(gradient(low_pass(ir)))
         vis_score = torch.sign(
             vis_grad_lowpass - torch.minimum(vis_grad_lowpass, ir_grad_lowpass))
         ir_score = 1 - vis_score
