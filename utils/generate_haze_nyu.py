@@ -9,10 +9,12 @@ from __future__ import division
 
 # torch condiguration
 import argparse
+import os
 import pdb
 from random import uniform
 import numpy as np
 from PIL import Image
+import cv2
 import h5py
 
 
@@ -23,7 +25,7 @@ def read_nyu_depth(nyu_deepth_path):
     return images, depths
 
 
-def generate_haze(images, depths, img_size=(120, 160), img_num=1445):
+def generate_haze(images, depths, prefix, img_size=(240, 320), img_num=1445):
     total_num = 0
     for index in range(img_num):
         gt_image = (images[index, :, :, :]).astype(float)
@@ -32,7 +34,7 @@ def generate_haze(images, depths, img_size=(120, 160), img_num=1445):
         gt_image = gt_image / 255
 
         gt_depth = depths[index, :, :]
-        gt_image = np.array(Image.fromarray(gt_depth).resize(img_size)).astype(np.float32)
+        gt_depth = np.array(Image.fromarray(gt_depth).resize(img_size)).astype(np.float32)
         gt_depth = (gt_depth) / gt_depth.max()
         gt_depth = np.swapaxes(gt_depth, 0, 1)
 
@@ -55,14 +57,27 @@ def generate_haze(images, depths, img_size=(120, 160), img_num=1445):
                 tx1 = np.reshape(tx1, [m, n, 1])
                 max_transmission = np.tile(tx1, [1, 1, 3])
                 haze_image = gt_image * max_transmission + rep_atmosphere * (1 - max_transmission)
-                pdb.set_trace()
                 total_num = total_num + 1
+                out_path = os.path.join(prefix, f"{total_num}.jpg")
+                cv2.imwrite(out_path, np.array(haze_image*255.0).astype(np.uint8))
+
+
+def split_train_val(img_list, prefix, ratio=0.3):
+    train_list = np.random.choice(img_list, int(len(img_list)*(1-ratio)), replace=False)
+    val_list   = list(set(img_list) - set(train_list))
+    with open(os.path.join(prefix, 'train_list.txt'), 'w') as fout:
+        fout.write("\n".join(train_list))
+    with open(os.path.join(prefix, 'val_list.txt'), 'w') as fout:
+        fout.write("\n".join(val_list))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--nyu-path', type=str, default='./data/dehaze/nyu_depth_v2_labeled.mat')
-    parser.add_argument('--dataset', type=str, required=True, help='path to synthesized hazy images dataset store')
+    parser.add_argument('--prefix', type=str, required=True, help='path to synthesized hazy images dataset store')
     args = parser.parse_args()
-    images, depths = read_nyu_depth(args.nyu_path)
-    generate_haze(images, depths)
+    #images, depths = read_nyu_depth(args.nyu_path)
+    #generate_haze(images, depths, args.prefix)
+    import glob
+    img_list = glob.glob(args.prefix+'/*.jpg')
+    split_train_val(img_list, args.prefix)
