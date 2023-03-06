@@ -11,6 +11,7 @@ from torch import nn
 from torch.nn import functional as F
 import kornia
 
+import pdb
 from utils.utils import low_pass, gradient
 
 
@@ -155,17 +156,20 @@ class AdaptiveGradientL2Loss(nn.Module):
         self.l2loss = L2Loss(reduction='')
 
     def forward(self, fused_img, vis, ir):
-        # 维度对不上，应该是 element-wise
-        vis_grad_lowpass = gradient(
-            low_pass(torch.mean(vis, dim=1, keepdim=True)))
-        ir_grad_lowpass = gradient(
-            low_pass(torch.mean(ir, dim=1, keepdim=True)))
+        #vis        = torch.mean(vis, dim=1, keepdim=True)
+        #ir         = torch.mean(ir, dim=1, keepdim=True)
+        #fused_img  = torch.mean(fused_img, dim=1, keepdim=True)
+
+        vis_grad_lowpass = torch.abs(gradient(low_pass(vis)))
+        ir_grad_lowpass  = torch.abs(gradient(low_pass(ir)))
         vis_score = torch.sign(
             vis_grad_lowpass - torch.minimum(vis_grad_lowpass, ir_grad_lowpass))
         ir_score = 1 - vis_score
-        fused_img_grad = gradient(torch.mean(fused_img, dim=1, keepdim=True))
-        vis_grad = gradient(torch.mean(vis, dim=1, keepdim=True))
-        ir_grad = gradient(torch.mean(vis, dim=1, keepdim=True))
+
+        fused_img_grad = gradient(fused_img)
+        vis_grad = gradient(vis)
+        ir_grad = gradient(ir)
+
         loss_gradient = torch.mul(vis_score.detach(), torch.square(fused_img_grad - vis_grad) \
                         + torch.mul(ir_score.detach(), torch.square(fused_img_grad - ir_grad)))
         return torch.mean(loss_gradient)

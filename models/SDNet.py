@@ -15,7 +15,7 @@ __all__ = ["SDNet"]
 
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3,  
-                    act_fun=nn.PReLU, BN=nn.BatchNorm2d, padding=1):
+                    act_fun=nn.LeakyReLU, BN=None, padding=1):
         super(ConvBlock, self).__init__()
         if not BN is None:
             self.conv = nn.Sequential(
@@ -56,7 +56,8 @@ class DisassembleBlock(nn.Module):
         self.conv2 = ConvBlock(mid_channels, mid_channels)
         self.dec_layer = nn.Sequential(
             nn.Conv2d(mid_channels, out_channels, 3, padding=1),
-            nn.Sigmoid()
+            nn.Tanh(),
+            #nn.Sigmoid()
         )
 
     def forward(self, x):  
@@ -73,7 +74,8 @@ class SqueezeNet(nn.Module):
         self.ir_branch  = DenseBlock(ir_channels,  mid_channels)
         self.fuse_layer = nn.Sequential(
             nn.Conv2d(8*mid_channels, out_channels, 3, padding=1),
-            nn.Sigmoid()
+            nn.Tanh(),
+            #nn.Sigmoid()
         )
 
     def forward(self, vis_in, ir_in):  
