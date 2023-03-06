@@ -94,7 +94,17 @@ def main(config_file, is_eval):
         #model = torch.nn.DataParallel(model, device_ids=[1,2])
         model.load_state_dict(torch.load(os.path.join(
             common_config['save_path'], 'checkpoint.pth.tar'))['state_dict'], strict=True)
-        test(testloader, model, use_cuda)
+        #test(testloader, model, use_cuda)
+        model.eval()
+        
+        model_path = "ae_fusion.onnx"
+        input1 = torch.randn(1, 1, 512, 640) #.to("cuda")
+        input2 = torch.randn(1, 1, 512, 640) #.to("cuda")
+        model = model.cpu()
+        torch.onnx.export(model, (input1, input2), model_path, input_names=["vis", "ir"], 
+                                output_names=["output"],  verbose=False, opset_version=11)
+        import onnx_tool
+        onnx_tool.model_profile(model_path, None, None) # pass file name
         return
 
     #model = torch.nn.DataParallel(model, device_ids=[0,1,2])

@@ -10,7 +10,7 @@ import torch
 from torch import nn
 import pdb
 
-__all__ = ["SDNet"]
+__all__ = ["SDNet", "LightSDNet"]
 
 
 class ConvBlock(nn.Module):
@@ -109,3 +109,16 @@ class SDNet(nn.Module):
         fused_img       = self.squeeze(vis_in, ir_in)
         vis_out, ir_out = self.decompose(fused_img)
         return fused_img, vis_out, ir_out
+
+
+class LightSDNet(nn.Module):
+    def __init__(self, fuse_channels=1, mid_channels=6, vis_channels=1, ir_channels=1):
+        super(LightSDNet, self).__init__()
+        self.squeeze   = SqueezeNet(vis_channels, ir_channels, fuse_channels, mid_channels)
+        self.decompose = DecomposeNet(fuse_channels, mid_channels, vis_channels, ir_channels)
+
+    def forward(self, vis_in, ir_in):  
+        fused_img       = self.squeeze(vis_in, ir_in)
+        vis_out, ir_out = self.decompose(fused_img)
+        return fused_img, vis_out, ir_out
+        #return fused_img

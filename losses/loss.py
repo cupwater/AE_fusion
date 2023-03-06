@@ -169,7 +169,7 @@ class AdaptiveGradientL2Loss(nn.Module):
         fused_img_grad = gradient(fused_img)
         vis_grad = gradient(vis)
         ir_grad = gradient(ir)
-
-        loss_gradient = torch.mul(vis_score.detach(), torch.square(fused_img_grad - vis_grad) \
-                        + torch.mul(ir_score.detach(), torch.square(fused_img_grad - ir_grad)))
-        return torch.mean(loss_gradient)
+    
+        loss_gradient = torch.mean(torch.mul(vis_score.detach(), torch.square(fused_img_grad - vis_grad))) \
+                            + torch.mean(torch.mul(ir_score.detach(), torch.square(fused_img_grad - ir_grad)))
+        return loss_gradient
