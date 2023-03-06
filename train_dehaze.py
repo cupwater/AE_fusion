@@ -62,19 +62,10 @@ def main(config_file):
     # Model
     print("==> creating model '{}'".format(common_config['arch']))
     model = models.__dict__[common_config['arch']]()
-    # model.load_state_dict(torch.load(common_config['pretrained_weights'])[
-    #                       'state_dict'], strict=False)
+
     if use_cuda:
         model = model.cuda()
     torch.backends.cudnn.benchmark = True
-
-    # get all the loss functions into criterion_list
-    # optimizer and scheduler
-    criterion_list = []
-    for loss_key, loss_dict in config['loss_config'].items():
-        criterion = losses.__dict__[loss_dict['type']]()
-        weight = loss_dict['weight']
-        criterion_list.append([criterion, weight, loss_key])
 
     optimizer = torch.optim.SGD(
         filter(
@@ -83,6 +74,8 @@ def main(config_file):
         lr=common_config['lr'],
         momentum=0.9,
         weight_decay=common_config['weight_decay'])
+
+    criterion = losses.L2Loss()
 
     # logger
     logger = Logger(os.path.join(common_config['save_path'], 'log.txt'))
@@ -93,8 +86,7 @@ def main(config_file):
         adjust_learning_rate(optimizer, epoch, common_config)
         print('\nEpoch: [%d | %d] LR: %f' %
               (epoch + 1, common_config['epoch'], state['lr']))
-        train_loss = train(trainloader, model,
-                           criterion_list, optimizer, use_cuda)
+        train_loss = train(trainloader, model, criterion, optimizer, use_cuda)
         # append logger file
         logger.append([state['lr'], train_loss, train_loss])
         best_loss = min(train_loss, best_loss)
@@ -103,30 +95,32 @@ def main(config_file):
             'state_dict': model.state_dict(),
         }, train_loss < best_loss, save_path=common_config['save_path'])
 
-    test(testloader, model, criterion_list, use_cuda)
+    test(testloader, model, criterion, use_cuda)
     logger.close()
 
 
-def train(trainloader, model, criterion_list, optimizer, use_cuda):
+def train(trainloader, model, criterion, optimizer, use_cuda):
     # switch to train mode
     model.train()
-
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
     end = time.time()
 
     model.train()
-    for batch_idx, (vis_input, ir_input) in enumerate(trainloader):
+    for batch_idx, (inputs, targets) in enumerate(trainloader):
         # measure data loading time
         data_time.update(time.time() - end)
         if use_cuda:
-            vis_input, ir_input = vis_input.cuda(), ir_input.cuda()
+            inputs, targets = inputs.cuda(), targets.cuda()
+        
+        outputs = model(inputs)
+        loss = criterion(outputs, targets)
 
-        losses.update(all_loss.item(), vis_input.size(0))
+        losses.update(loss.item(), inputs.size(0))
         # compute gradient and do SGD step
         optimizer.zero_grad()
-        all_loss.backward()
+        loss.backward()
         optimizer.step()
         progress_bar(batch_idx, len(trainloader), 'Loss: %.2f ' % (losses.avg))
         # measure elapsed time
@@ -139,29 +133,15 @@ def test(testloader, model, criterion, use_cuda):
     global best_loss
     # switch to evaluate mode
     model.eval()
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
     losses = AverageMeter()
-    end = time.time()
-
     model.eval()
-    for batch_idx, (vis_input, ir_input) in enumerate(testloader):
-        # measure data loading time
-        data_time.update(time.time() - end)
+    for batch_idx, (inputs, targets) in enumerate(testloader):
         if use_cuda:
-            vis_input, ir_input = vis_input.cuda(), ir_input.cuda()
-        vis_input = torch.autograd.Variable(vis_input)
-        ir_input = torch.autograd.Variable(ir_input)
-
-        fuse_out = model(vis_input, ir_input).cpu().detach().numpy()
-        for idx in range(fuse_out.shape[0]):
-            img = fuse_out[idx, 0]
-            imsave(f"data/test_results/{batch_idx}_{idx}.jpg", img)
-
-        progress_bar(batch_idx, len(testloader))
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
+            inputs, targets = inputs.cuda(), targets.cuda()
+        outputs = model(inputs)
+        loss = criterion(outputs, targets)
+        losses.update(loss.item(), inputs.size(0))
+        progress_bar(batch_idx, len(testloader), 'Loss: %.2f ' % (losses.avg))
     return (losses.avg)
 
 
