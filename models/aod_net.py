@@ -1,7 +1,7 @@
 '''
 Author: Peng Bo
 Date: 2023-02-15 15:44:37
-LastEditTime: 2023-03-07 08:40:46
+LastEditTime: 2023-03-07 08:44:41
 Description: 
 
 '''
@@ -82,12 +82,6 @@ if __name__ == '__main__':
     pt_model.eval()
     # inference using pytorch model 
     pt_output = pt_model(torch.FloatTensor(torch.from_numpy(processed_frame)))
-    #LightAODNet_Dehazept_model.eval()
-    #model_path = "dehaze_data/LightAODNet_Dehaze.onnx"
-    #dummy_input = torch.randn(1, 3, 1080, 1920) #.to("cuda")
-    #torch.onnx.export(pt_model, dummy_input, model_path, verbose=False, input_names=['input'], output_names=['output'], opset_version=11)
-    #import onnx_tool
-    #onnx_tool.model_profile(model_path, None, None) # pass file name
 
     # convert the output to image
     pt_output = pt_output.data.cpu().numpy().squeeze().transpose((1,2,0))*127.5+127.5
