@@ -1,7 +1,7 @@
 '''
 Author: Peng Bo
 Date: 2023-02-15 15:44:37
-LastEditTime: 2023-02-15 18:12:50
+LastEditTime: 2023-03-07 08:40:46
 Description: 
 
 '''
@@ -78,31 +78,30 @@ if __name__ == '__main__':
 
     pt_model = LightAODnet()
     #pt_model.load_state_dict(torch.load("dehaze_data/AODNet_dehaze.pth", map_location='cpu'))
-    pt_model.load_state_dict(torch.load("experiments/dehaze_lightaodnet/checkpoint.pth.tar", map_location='cpu')['state_dict'])
+    pt_model.load_state_dict(torch.load("dehaze_data/light_aodnet.pth", map_location='cpu'))
     pt_model.eval()
     # inference using pytorch model 
     pt_output = pt_model(torch.FloatTensor(torch.from_numpy(processed_frame)))
-
-    pt_model.eval()
-    model_path = "LightAODNet_Dehaze.onnx"
-    dummy_input = torch.randn(1, 3, 1080, 1920) #.to("cuda")
-    torch.onnx.export(pt_model, dummy_input, model_path, verbose=False, input_names=['input'], output_names=['output'], opset_version=11)
-    import onnx_tool
-    onnx_tool.model_profile(model_path, None, None) # pass file name
-
+    #LightAODNet_Dehazept_model.eval()
+    #model_path = "dehaze_data/LightAODNet_Dehaze.onnx"
+    #dummy_input = torch.randn(1, 3, 1080, 1920) #.to("cuda")
+    #torch.onnx.export(pt_model, dummy_input, model_path, verbose=False, input_names=['input'], output_names=['output'], opset_version=11)
+    #import onnx_tool
+    #onnx_tool.model_profile(model_path, None, None) # pass file name
 
     # convert the output to image
     pt_output = pt_output.data.cpu().numpy().squeeze().transpose((1,2,0))*127.5+127.5
     pt_output[pt_output>255] = 255
     pt_output[pt_output<0] = 0
-
     cv2.imwrite("dehaze_data/dehaze_output_pt.jpg", pt_output.astype(np.uint8)[:,:,::-1])
     
     # inference using onnx model 
     import onnxruntime as ort
-    onnx_model = ort.InferenceSession("dehaze_data/AODNet_Dehaze.onnx")
+    onnx_model = ort.InferenceSession("dehaze_data/LightAODNet_Dehaze.onnx")
     prediction = onnx_model.run(None, {"input": processed_frame})[0][0]
-    prediction = prediction.transpose((1,2,0))*255
+    prediction = prediction.transpose((1,2,0))*127.5+127.5
+    prediction[prediction>255] = 255
+    prediction[prediction<0] = 0
     cv2.imwrite("dehaze_data/dehaze_output_onnx.jpg", prediction.astype(np.uint8)[:,:,::-1])
 
     pdb.set_trace()
