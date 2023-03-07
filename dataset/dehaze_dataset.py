@@ -12,7 +12,7 @@ import pdb
 import numpy as np
 from torch.utils.data import Dataset
 
-__all__ = ['VisibleInfraredPadehaze_imgDataset']
+__all__ = ['DehazeDataset']
 
 class DehazeDataset (Dataset):
 
@@ -36,7 +36,7 @@ class DehazeDataset (Dataset):
         haze_img = haze_img.transpose((2,0,1))
         dehaze_img  = dehaze_img.transpose((2,0,1))
         haze_img, dehaze_img = torch.FloatTensor(haze_img), torch.FloatTensor(dehaze_img)
-        haze_img, dehaze_img = haze_img / 255.0, dehaze_img / 255.0
+        dehaze_img = (dehaze_img-127.5) / 127.5
         return haze_img, dehaze_img
 
     def __len__(self):

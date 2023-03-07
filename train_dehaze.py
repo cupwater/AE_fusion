@@ -5,6 +5,9 @@ Copyright (c) Pengbo, 2021
 from __future__ import print_function
 
 
+import pdb
+import cv2
+import numpy as np
 import os
 import shutil
 import time
@@ -114,6 +117,11 @@ def train(trainloader, model, criterion, optimizer, use_cuda):
         if use_cuda:
             inputs, targets = inputs.cuda(), targets.cuda()
         
+        #img = inputs.detach().cpu().numpy()[0]
+        #tgt = targets.detach().cpu().numpy()[0]
+        #cv2.imwrite('inp.jpg', np.transpose((127.5*img+127.5), (1,2,0)).astype(np.uint8))
+        #cv2.imwrite('tgt.jpg', np.transpose((127.5*tgt+127.5), (1,2,0)).astype(np.uint8))
+        #pdb.set_trace()
         outputs = model(inputs)
         loss = criterion(outputs, targets)
 

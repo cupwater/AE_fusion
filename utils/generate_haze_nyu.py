@@ -57,14 +57,20 @@ def generate_haze(images, depths, prefix, img_size=(240, 320), img_num=1445):
                 tx1 = np.reshape(tx1, [m, n, 1])
                 max_transmission = np.tile(tx1, [1, 1, 3])
                 haze_image = gt_image * max_transmission + rep_atmosphere * (1 - max_transmission)
+
+
                 total_num = total_num + 1
-                out_path = os.path.join(prefix, f"{total_num}.jpg")
+                out_path = os.path.join(prefix, f"nyu_dehaze/{total_num}.jpg")
+                cv2.imwrite(out_path, np.array(gt_image*255.0).astype(np.uint8))
+                out_path = os.path.join(prefix, f"nyu_haze/{total_num}.jpg")
                 cv2.imwrite(out_path, np.array(haze_image*255.0).astype(np.uint8))
 
 
 def split_train_val(img_list, prefix, ratio=0.3):
     train_list = np.random.choice(img_list, int(len(img_list)*(1-ratio)), replace=False)
+    train_list = [ line + ',' + line.replace('nyu_dehaze', 'nyu_haze') for line in train_list]
     val_list   = list(set(img_list) - set(train_list))
+    val_list = [ line.replace('nyu_dehaze', 'nyu_haze') + ',' + line for line in val_list]
     with open(os.path.join(prefix, 'train_list.txt'), 'w') as fout:
         fout.write("\n".join(train_list))
     with open(os.path.join(prefix, 'val_list.txt'), 'w') as fout:
@@ -76,8 +82,8 @@ if __name__ == "__main__":
     parser.add_argument('--nyu-path', type=str, default='./data/dehaze/nyu_depth_v2_labeled.mat')
     parser.add_argument('--prefix', type=str, required=True, help='path to synthesized hazy images dataset store')
     args = parser.parse_args()
-    #images, depths = read_nyu_depth(args.nyu_path)
-    #generate_haze(images, depths, args.prefix)
+    images, depths = read_nyu_depth(args.nyu_path)
+    generate_haze(images, depths, args.prefix)
     import glob
-    img_list = glob.glob(args.prefix+'/*.jpg')
+    img_list = glob.glob(args.prefix+'/nyu_dehaze/*.jpg')
     split_train_val(img_list, args.prefix)
