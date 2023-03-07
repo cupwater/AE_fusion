@@ -76,9 +76,9 @@ if __name__ == '__main__':
     ori_img = cv2.imread("dehaze_data/dehaze_input.jpg")
     processed_frame = preprocess(ori_img)
 
-    pt_model = LightAODnet()
-    #pt_model.load_state_dict(torch.load("dehaze_data/AODNet_dehaze.pth", map_location='cpu'))
-    pt_model.load_state_dict(torch.load("dehaze_data/light_aodnet.pth", map_location='cpu'))
+    pt_model = AODnet()
+    pt_model.load_state_dict(torch.load("dehaze_data/AODNet_dehaze.pth", map_location='cpu'))
+    #pt_model.load_state_dict(torch.load("dehaze_data/light_aodnet.pth", map_location='cpu'))
     pt_model.eval()
     # inference using pytorch model 
     pt_output = pt_model(torch.FloatTensor(torch.from_numpy(processed_frame)))
@@ -97,6 +97,4 @@ if __name__ == '__main__':
     prediction[prediction>255] = 255
     prediction[prediction<0] = 0
     cv2.imwrite("dehaze_data/dehaze_output_onnx.jpg", prediction.astype(np.uint8)[:,:,::-1])
-
-    pdb.set_trace()
 
