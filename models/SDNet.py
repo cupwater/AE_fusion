@@ -163,7 +163,7 @@ if __name__ == '__main__':
     ir_tensor  = torch.FloatTensor(torch.from_numpy(ir))
 
     pt_model = LightSDNetONNX()
-    pt_model.load_state_dict(torch.load("fusion_data/LightSDNetONNX.pth", map_location='cpu'))
+    pt_model.load_state_dict(torch.load("fusion_data/LightSDNetRaw.pth", map_location='cpu'))
     pt_model.eval()
     pt_output = pt_model(rgb_tensor, ir_tensor)
 
