@@ -10,7 +10,7 @@ import torch
 from torch import nn
 import pdb
 
-__all__ = ["SDNet", "LightSDNet"]
+__all__ = ["SDNet", "LightSDNet", "LightSDNetONNX"]
 
 
 class ConvBlock(nn.Module):
@@ -111,6 +111,27 @@ class SDNet(nn.Module):
         return fused_img, vis_out, ir_out
 
 
+class LightSDNetONNX(nn.Module):
+    def __init__(self, fuse_channels=1, mid_channels=6, vis_channels=1, ir_channels=1):
+        super(LightSDNetONNX, self).__init__()
+        self.squeeze   = SqueezeNet(vis_channels, ir_channels, fuse_channels, mid_channels)
+        self.decompose = DecomposeNet(fuse_channels, mid_channels, vis_channels, ir_channels)
+
+    def forward(self, rgb, ir):  
+        R, G, B = rgb[:, 0:1], rgb[:, 1:2], rgb[:, 2:3]
+        Y  = 0.257*R  + 0.564*G + 0.098*B + 16
+        Cb = -0.148*R - 0.291*G + 0.439*B + 128
+        Cr = 0.439*R  - 0.368*G - 0.071*B + 128
+        Y  = Y/127.5  - 1
+        ir = ir/127.5 - 1
+        outY = 127.5*self.squeeze(Y, ir) + 127.5
+        R = 1.164*(outY-16) + 1.596*(Cr-128)
+        G = 1.164*(outY-16) - 0.392*(Cb-128) - 0.813*(Cr-128)
+        B = 1.164*(outY-16) + 2.017*(Cb-128)
+        fused_img = torch.cat((R,G,B), 1)
+        return fused_img
+
+
 class LightSDNet(nn.Module):
     def __init__(self, fuse_channels=1, mid_channels=6, vis_channels=1, ir_channels=1):
         super(LightSDNet, self).__init__()
@@ -122,3 +143,41 @@ class LightSDNet(nn.Module):
         vis_out, ir_out = self.decompose(fused_img)
         return fused_img, vis_out, ir_out
         #return fused_img
+
+
+if __name__ == '__main__':
+
+    import numpy as np
+    import cv2
+
+    rgb = cv2.imread("fusion_data/test_vis.jpg").astype(np.float32)
+    rgb = cv2.resize(rgb, (640, 512))
+    rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
+    ir  = cv2.imread("fusion_data/test_ir.jpg", cv2.IMREAD_GRAYSCALE)
+    ir  = cv2.resize(ir, (640, 512))
+    ir  = np.expand_dims(ir, axis=2).astype(np.float32)
+    
+    rgb = np.expand_dims(np.transpose(rgb, [2, 0, 1]), axis=0)
+    ir  = np.expand_dims(np.transpose(ir, [2, 0, 1]), axis=0)
+    rgb_tensor = torch.FloatTensor(torch.from_numpy(rgb))
+    ir_tensor  = torch.FloatTensor(torch.from_numpy(ir))
+
+    pt_model = LightSDNetONNX()
+    pt_model.load_state_dict(torch.load("fusion_data/LightSDNetONNX.pth", map_location='cpu'))
+    pt_model.eval()
+    pt_output = pt_model(rgb_tensor, ir_tensor)
+
+    # convert the output to image
+    pt_output = pt_output.data.cpu().numpy().squeeze().transpose((1,2,0))
+    pt_output[pt_output>255] = 255
+    pt_output[pt_output<0] = 0
+    cv2.imwrite("fusion_data/fuse_pt.jpg", pt_output.astype(np.uint8)[:,:,::-1])
+    
+    # inference using onnx model 
+    import onnxruntime as ort
+    onnx_model = ort.InferenceSession("fusion_data/LightSDNetRaw.onnx")
+    prediction = onnx_model.run(None, {"rgb": rgb, "ir": ir})[0][0]
+    prediction = prediction.transpose((1,2,0))
+    prediction[prediction>255] = 255
+    prediction[prediction<0] = 0
+    cv2.imwrite("fusion_data/fuse_onnx.jpg", prediction.astype(np.uint8)[:,:,::-1])

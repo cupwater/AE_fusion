@@ -98,10 +98,10 @@ def main(config_file, is_eval):
         model.eval()
         
         model_path = "ae_fusion.onnx"
-        input1 = torch.randn(1, 1, 512, 640) #.to("cuda")
+        input1 = torch.randn(1, 3, 512, 640) #.to("cuda")
         input2 = torch.randn(1, 1, 512, 640) #.to("cuda")
         model = model.cpu()
-        torch.onnx.export(model, (input1, input2), model_path, input_names=["vis", "ir"], 
+        torch.onnx.export(model, (input1, input2), model_path, input_names=["rgb", "ir"], 
                                 output_names=["output"],  verbose=False, opset_version=11)
         import onnx_tool
         onnx_tool.model_profile(model_path, None, None) # pass file name
