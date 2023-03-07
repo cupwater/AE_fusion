@@ -7,4 +7,5 @@ Description: In User Settings Edit
 
 from .pix2pix import *
 from .visible_infrared_dataset import *
+from .dehaze_dataset import *
 from .YCrCb_infrared_dataset import *

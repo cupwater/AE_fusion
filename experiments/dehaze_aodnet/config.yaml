@@ -1,5 +1,5 @@
 common:
-    arch: AODNet
+    arch: AODnet
     workers: 4
     train_batch: 128
     test_batch: 1
@@ -9,10 +9,10 @@ common:
     epoch: 30
     scheduler: [15, 25]
     momentum: 0.9
-    weight_decay: 0.0005
+    weight_decay: 0.0002
     nesterov: True
     print_interval: 20
-    save_path: 'experiments/RGBT210_fusion'
+    save_path: 'experiments/dehaze_aodnet'
 
 loss_config:
 
@@ -21,5 +21,5 @@ dataset :
     final_size: [240, 320]
     type: DehazeDataset
     train_list: '/data/dehaze/train_list.txt'
-    test_list: '/data/dehaze/test_list.txt'
+    test_list: '/data/dehaze/val_list.txt'
     prefix: ''

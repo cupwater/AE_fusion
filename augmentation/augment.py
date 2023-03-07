@@ -8,9 +8,13 @@ Description:
 import albumentations as A
 
 def TrainTransform(crop_size=224, final_size=256):
+    if not isinstance(crop_size, list):
+        crop_size = [crop_size, crop_size]
+    if not isinstance(final_size, list):
+        final_size = [final_size, final_size]
     return A.Compose([
-        A.RandomCrop(width=crop_size, height=crop_size),
-        A.Resize(final_size, final_size),
+        A.RandomCrop(width=crop_size[0], height=crop_size[1]),
+        A.Resize(final_size[0], final_size[1]),
         A.ShiftScaleRotate(shift_limit=0.02, scale_limit=0.05, rotate_limit=15),
         A.HorizontalFlip(p=0.5),
         A.RandomBrightnessContrast(p=0.1),
@@ -19,6 +23,10 @@ def TrainTransform(crop_size=224, final_size=256):
     ])
 
 def TestTransform(crop_size=None, final_size=None):
+    if not crop_size is None and not isinstance(crop_size, list):
+        crop_size = [crop_size, crop_size]
+    if not isinstance(final_size, list):
+        final_size = [final_size, final_size]
     if crop_size is None:
         return A.Compose([
             A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
@@ -26,8 +34,8 @@ def TestTransform(crop_size=None, final_size=None):
         ])
     else:
         return A.Compose([
-            A.CenterCrop(width=crop_size, height=crop_size),
-            A.Resize(final_size, final_size),
+            A.CenterCrop(width=crop_size[0], height=crop_size[1]),
+            A.Resize(final_size[0], final_size[1]),
             A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
             #A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
         ])
