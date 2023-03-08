@@ -27,7 +27,7 @@ best_loss = 999
 use_cuda = True
 
 
-def main(config_file):
+def main(config_file, is_eval):
     global state, best_loss, use_cuda
 
     # parse config of model training
@@ -79,6 +79,22 @@ def main(config_file):
         weight_decay=common_config['weight_decay'])
 
     criterion = losses.L2Loss()
+
+    if is_eval:
+        #model = torch.nn.DataParallel(model, device_ids=[1,2])
+        model.load_state_dict(torch.load(os.path.join(
+            common_config['save_path'], 'checkpoint.pth.tar'))['state_dict'], strict=True)
+        model.eval()
+
+        model_path = "dehaze_tiny_aodnet.onnx"
+        inputs = torch.randn(1, 3, 1080, 1920) #.to("cuda")
+        model = model.cpu()
+        torch.onnx.export(model, inputs, model_path, input_names=["input"],
+                                output_names=["output"],  verbose=False, opset_version=11)
+        import onnx_tool
+        onnx_tool.model_profile(model_path, None, None) # pass file name
+        return
+
 
     # logger
     logger = Logger(os.path.join(common_config['save_path'], 'log.txt'))
@@ -175,5 +191,6 @@ if __name__ == '__main__':
     # model related, including  Architecture, path, datasets
     parser.add_argument('--config-file', type=str,
                         default='experiments/template/config.yaml')
+    parser.add_argument('--eval', action='store_true')
     args = parser.parse_args()
-    main(args.config_file)
+    main(args.config_file, args.eval)
