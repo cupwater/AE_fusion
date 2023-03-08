@@ -56,6 +56,7 @@ class LightAODnet(nn.Module):
         output = k * x - k + self.b
         return output
 
+
 class TinyAODnet(nn.Module):   
     def __init__(self):
         super(TinyAODnet, self).__init__()
@@ -76,6 +77,27 @@ class TinyAODnet(nn.Module):
         x4 = F.relu(self.conv4(cat2))
         cat3 = torch.cat((x1, x2, x3, x4),1)
         k = F.relu(self.conv5(cat3))
+        output = k * x - k + self.b
+        return output
+
+
+class XLTinyAODnet(nn.Module):   
+    def __init__(self):
+        super(XLTinyAODnet, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels=3,  out_channels=3, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(in_channels=3,  out_channels=3, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(in_channels=6,  out_channels=3, kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(in_channels=6,  out_channels=3, kernel_size=1, padding=0)
+        self.b = 1
+        self.weights_init_normal()
+
+    def forward(self, x):  
+        x1 = F.relu(self.conv1(x))
+        x2 = F.relu(self.conv2(x1))
+        cat1 = torch.cat((x1, x2), 1)
+        x3 = F.relu(self.conv3(cat1))
+        cat2 = torch.cat((x2, x3),1)
+        k = F.relu(self.conv4(cat2))
         output = k * x - k + self.b
         return output
 
