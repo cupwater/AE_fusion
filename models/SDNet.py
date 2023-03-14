@@ -8,6 +8,7 @@ Description:
 # coding: utf8
 import torch
 from torch import nn
+import time
 import pdb
 
 __all__ = ["SDNet", "LightSDNet", "LightSDNetONNX"]
@@ -150,10 +151,10 @@ if __name__ == '__main__':
     import numpy as np
     import cv2
 
-    rgb = cv2.imread("fusion_data/test_vis.jpg").astype(np.float32)
+    rgb = cv2.imread("fusion_data/test_vis.png").astype(np.float32)
     rgb = cv2.resize(rgb, (640, 512))
     rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
-    ir  = cv2.imread("fusion_data/test_ir.jpg", cv2.IMREAD_GRAYSCALE)
+    ir  = cv2.imread("fusion_data/test_ir.png", cv2.IMREAD_GRAYSCALE)
     ir  = cv2.resize(ir, (640, 512))
     ir  = np.expand_dims(ir, axis=2).astype(np.float32)
     
@@ -176,7 +177,12 @@ if __name__ == '__main__':
     # inference using onnx model 
     import onnxruntime as ort
     onnx_model = ort.InferenceSession("fusion_data/LightSDNetRaw.onnx")
-    prediction = onnx_model.run(None, {"rgb": rgb, "ir": ir})[0][0]
+    for i in range(20):
+        start_time = time.time()
+        prediction = onnx_model.run(None, {"rgb": rgb, "ir": ir})[0][0]
+        print(f"inference time: {time.time()-start_time}")
+
+    #prediction = onnx_model.run(None, {"rgb": rgb, "ir": ir})[0][0]
     prediction = prediction.transpose((1,2,0))
     prediction[prediction>255] = 255
     prediction[prediction<0] = 0
