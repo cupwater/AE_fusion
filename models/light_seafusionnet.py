@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import pdb
 import time
 
 
@@ -156,7 +157,6 @@ if __name__ == '__main__':
 
     import numpy as np
     import cv2
-
     rgb = cv2.imread("fusion_data/test_vis.png").astype(np.float32)
     rgb = cv2.resize(rgb, (640, 512))
     rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
@@ -189,7 +189,39 @@ if __name__ == '__main__':
         prediction = onnx_model.run(None, {"rgb": rgb, "ir": ir})[0][0]
         print(f"inference time: {time.time()-start_time}")
 
-    prediction = prediction.transpose((1,2,0))
-    prediction[prediction>255] = 255
-    prediction[prediction<0] = 0
-    cv2.imwrite("fusion_data/fuse_onnx.png", prediction.astype(np.uint8)[:,:,::-1])
+
+    # prediction = prediction.transpose((1,2,0))
+    # prediction[prediction>255] = 255
+    # prediction[prediction<0] = 0
+    # cv2.imwrite("fusion_data/fuse_onnx.png", prediction.astype(np.uint8)[:,:,::-1])
+
+
+    # target_size  = (720, 480)
+    # vis_writer  = cv2.VideoWriter("fusion_data/videos/vis.mp4", cv2.VideoWriter_fourcc(*'MP4V'), 25.0, target_size)
+    # ir_writer   = cv2.VideoWriter("fusion_data/videos/ir.mp4", cv2.VideoWriter_fourcc(*'XVID'), 25.0, target_size)
+    # fuse_writer = cv2.VideoWriter("fusion_data/videos/fuse.mp4", cv2.VideoWriter_fourcc(*'MP4V'), 25.0, target_size)
+
+    # for i in range(1500, 3900):
+    #     rgb_ori = cv2.imread(f"fusion_data/videos/take_2/VIS/VIS_{i}.jpg")
+    #     rgb = cv2.resize(rgb_ori.astype(np.float32), (640, 512))
+    #     rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
+    #     rgb = np.expand_dims(np.transpose(rgb, [2, 0, 1]), axis=0)
+
+    #     ir_ori = cv2.imread(f"fusion_data/videos/take_2/IR/IR_{i}.jpg", cv2.IMREAD_GRAYSCALE)
+    #     ir_ori = cv2.imread(f"fusion_data/videos/take_2/IR/IR_{i}.jpg")
+    #     ir = cv2.resize(ir_ori, (640, 512))
+    #     ir = np.expand_dims(ir, axis=2).astype(np.float32)
+    #     ir = np.expand_dims(np.transpose(ir, [2, 0, 1]), axis=0)
+
+    #     prediction = onnx_model.run(None, {"rgb": rgb, "ir": ir})[0][0]
+    #     prediction = prediction.transpose((1,2,0))
+    #     prediction[prediction>255] = 255
+    #     prediction[prediction<0] = 0
+    #     fused_img = cv2.resize(prediction.astype(np.uint8)[:,:,::-1], target_size)
+
+    #     vis_writer.write(rgb_ori)
+    #     ir_writer.write(ir_ori)
+    #     fuse_writer.write(fused_img)
+
+
+

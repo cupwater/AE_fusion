@@ -1,4 +1,8 @@
 __pycache__
+dehaze_data
+*.pt
+*.gz
+*.pth
 *.mp4
 *.tar
 *.jpg
