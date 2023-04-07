@@ -97,12 +97,11 @@ class RGBD(nn.Module):
         return F.leaky_relu(x1+x2, negative_slope=0.1)
 
 
-class SeAFusionNet(nn.Module):
+class TinySeAFusionNet(nn.Module):
     def __init__(self, out_channel=1):
-        super(SeAFusionNet, self).__init__()
-        vis_ch = [4, 8, 12]
-        inf_ch = [4, 8, 12]
-        output = 1
+        super(TinySeAFusionNet, self).__init__()
+        vis_ch = [3, 6, 9]
+        inf_ch = [3, 6, 9]
         self.vis_conv = ConvLeakyRelu2d(1, vis_ch[0])
         self.vis_rgbd1 = RGBD(vis_ch[0], vis_ch[1])
         self.vis_rgbd2 = RGBD(vis_ch[1], vis_ch[2])

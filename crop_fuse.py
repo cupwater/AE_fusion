@@ -55,6 +55,13 @@ def crop_tetragon(img, tgt_size, M, M_reverse):
     return dst_img, reverse_img
 
 
+def crop_tetragon_noaffine(img, tgt_size, top_left=(388, 127), bottom_right=(1603, 1065)):
+    # img_width, img_height = 512, 640
+    crop_img = img[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]]
+    resize_crop_img = cv2.resize(crop_img, tgt_size)
+    return resize_crop_img, crop_img
+
+
 def on_IR_EVENT_BUTTON(event, x, y, flags, param):
     if event == cv2.EVENT_LBUTTONDOWN:
         xy = "%d,%d" % (x, y)
@@ -75,7 +82,6 @@ def on_VIS_EVENT_BUTTON(event, x, y, flags, param):
         print(x, y)
 
 def fusion_imgs(img1, img2):
-    mask = (img2[:,:,0]+1)==0
     _, mask = cv2.threshold(cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY), 0, 255, cv2.THRESH_BINARY)
     mask_inv = cv2.bitwise_not(mask)
     img_bg = cv2.bitwise_and(img1, img1, mask=mask_inv)
@@ -86,10 +92,10 @@ def fusion_imgs(img1, img2):
 
 if __name__ == "__main__":
     
-    cv2.namedWindow("vis")
-    cv2.namedWindow("ir")
-    cv2.setMouseCallback("vis", on_VIS_EVENT_BUTTON)
-    cv2.setMouseCallback("ir", on_IR_EVENT_BUTTON)
+    # cv2.namedWindow("vis")
+    # cv2.namedWindow("ir")
+    # cv2.setMouseCallback("vis", on_VIS_EVENT_BUTTON)
+    # cv2.setMouseCallback("ir", on_IR_EVENT_BUTTON)
 
     # M = np.float32([
     #         [ 4.92417784e-01, -1.25833390e-01, -1.57544109e+02],
@@ -102,39 +108,43 @@ if __name__ == "__main__":
     #         [-1.06023094e-05, 5.06254471e-04, 1.00000000e+00]
     #     ])
 
-    M = np.float32(
-       [[0.527,    0.   , -193.844],
-       [   0.   ,    0.546,  -74.78 ],
-       [   0.   ,   -0.   ,    1.   ]]
-    )
-    M_reverse = np.float32(
-       [[  1.8984375 ,   0.        , 368.        ],
-       [  0.        ,   1.83203125, 137.        ],
-       [ -0.        ,  -0.        ,   1.        ]]
-    )
+    # M = np.float32(
+    #    [[0.527,    0.   , -193.844],
+    #    [   0.   ,    0.546,  -74.78 ],
+    #    [   0.   ,   -0.   ,    1.   ]]
+    # )
+    # M_reverse = np.float32(
+    #    [[ 1.8984375 ,0., 368.],
+    #    [ 0. , 1.83203125, 137.],
+    #    [ -0. , -0., 1.]]
+    # )
 
     for i in range(6):
-        ir_click_list = []
-        vis_click_list = []
-
         ir = cv2.imread(f"fusion_data/fusion_pairs/hongwai_{i}.jpg")
         vis = cv2.imread(f"fusion_data/fusion_pairs/kejianguang_{i}.jpg")
+        tgt_h, tgt_w = ir.shape[:2]
+
+        # ir_click_list = []
+        # vis_click_list = []
         # cv2.imshow("ir", ir)
         # cv2.imshow("vis", vis)
         # cv2.waitKey(-1)
         # src_pts = np.float32(vis_click_list)
         # dst_pts = np.float32(ir_click_list)
-        tgt_h, tgt_w = ir.shape[:2]
         # M, M_reverse = get_affine_M(src_pts=src_pts, dst_pts=dst_pts)
-        _, reverse_img = crop_tetragon(vis, (tgt_w, tgt_h), M, M_reverse)
-        fuse_img = fusion_imgs(vis, reverse_img)
-        cv2.imshow("fuse", fuse_img)
-        cv2.waitKey(-1)
-
-        print(M)
-        print(M_reverse)
+        # dst_img, reverse_img = crop_tetragon(vis, (tgt_w, tgt_h), M, M_reverse)
+        # fuse_img = fusion_imgs(vis, reverse_img)
+        # cv2.imshow("fuse", fuse_img)
+        # cv2.waitKey(-1)
+        # print(M)
+        # print(M_reverse)
         # pdb.set_trace()
         # cv2.imwrite('fusion_data/fuse_img.jpg', fuse_img)
+
+        dst_img, reverse_img = crop_tetragon_noaffine(vis, (tgt_w, tgt_h))
+        cv2.imshow('crop_img', dst_img)
+        cv2.imshow('ir', ir)
+        cv2.waitKey(-1)
 
     # img = cv2.imread('fusion_data/test_vis.jpg')
     # _, reverse_img = crop_tetragon(img)
