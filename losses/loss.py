@@ -246,4 +246,4 @@ class FusionLoss(nn.Module):
         x_grad_joint = torch.max(y_grad, ir_grad)
         loss_grad = F.l1_loss(x_grad_joint, generate_img_grad)
         loss_total = loss_in+10*loss_grad
-        return loss_total, loss_in, loss_grad
+        return loss_total #, loss_in, loss_grad

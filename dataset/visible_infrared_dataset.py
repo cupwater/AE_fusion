@@ -13,9 +13,9 @@ import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset
 
-__all__ = ['VisibleInfraredPairDataset']
+__all__ = ['VisibleInfrared3CPairDataset', 'VisibleInfrared1CPairDataset']
 
-class VisibleInfraredPairDataset (Dataset):
+class VisibleInfrared3CPairDataset (Dataset):
 
     # --------------------------------------------------------------------------------
     def __init__(self, imgs_list, transform, prefix='data/'):
@@ -45,6 +45,39 @@ class VisibleInfraredPairDataset (Dataset):
         return len(self.imgs_list)
 
 
+class VisibleInfrared1CPairDataset (Dataset):
+
+    # --------------------------------------------------------------------------------
+    def __init__(self, imgs_list, transform, prefix='data/'):
+
+        self.prefix = prefix
+        # read img_list
+        self.imgs_list = [l.strip() for l in open(imgs_list).readlines()]
+        self.transform = transform
+
+    def __getitem__(self, index):
+        p1, p2 = self.imgs_list[index].strip().split(',')
+        rgb_path, ir_path = os.path.join(self.prefix, p1.strip()), os.path.join(self.prefix, p2.strip())
+
+        rgb = cv2.imread(rgb_path)
+        ir  = cv2.imread(ir_path, cv2.IMREAD_GRAYSCALE)
+        if self.transform != None:
+            result = self.transform(image=rgb, mask=ir)
+            rgb, ir = result['image'], result['mask']
+        vis = cv2.cvtColor(rgb, cv2.COLOR_BGR2GRAY)
+
+        vis = np.expand_dims(vis, axis=2)
+        vis = vis.transpose((2,0,1))
+        ir  = np.expand_dims(ir, axis=2)
+        ir  = ir.transpose((2,0,1))
+
+        vis, ir = torch.FloatTensor(vis), torch.FloatTensor(ir)
+        vis, ir = vis / 255.0, ir / 255.0
+        return vis, ir
+
+    def __len__(self):
+        return len(self.imgs_list)
+
 if __name__ == "__main__":
     import albumentations as A
 
@@ -67,7 +100,7 @@ if __name__ == "__main__":
 
     transform_train = TrainTransform(crop_size=110, final_size=128)
     transform_test  = TestTransform(crop_size=110, final_size=128)
-    trainset = VisibleInfraredPairDataset('./data/train_list.txt', transform_train, 
+    trainset = VisibleInfrared3CPairDataset('./data/train_list.txt', transform_train, 
         prefix="./data/train_vis_ir_images")
     
     rgb, ir = trainset.__getitem__(1)
