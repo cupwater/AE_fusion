@@ -442,7 +442,7 @@ class OverlapPatchEmbed(nn.Module):
         return x
 
 
-class Restormer_Encoder(nn.Module):
+class RestormerEncoder(nn.Module):
     def __init__(self,
                  inp_channels=1,
                  out_channels=1,
@@ -454,8 +454,7 @@ class Restormer_Encoder(nn.Module):
                  LayerNorm_type='WithBias',
                  ):
 
-        super(Restormer_Encoder, self).__init__()
-
+        super(RestormerEncoder, self).__init__()
         self.patch_embed = OverlapPatchEmbed(inp_channels, dim)
 
         self.shared_enc = nn.Sequential(*[TransformerBlock(dim=dim, num_heads=heads[0], ffn_expand_factor=ffn_expand_factor,
@@ -468,12 +467,9 @@ class Restormer_Encoder(nn.Module):
 
         self.coatt_layer = nn.Sequential(*[CrossModalityBlock(dim=dim, num_heads=heads[1], ffn_expand_factor=ffn_expand_factor,
                                     bias=bias, LayerNorm_type=LayerNorm_type) for _ in range(num_blocks[2])]) 
-
-        self.base_layer = BaseFeatureExtraction(dim=dim, num_heads = heads[2])
-        #self.base_layer  = BaseFeatureExtraction(dim=dim, num_heads = heads[2])
-
-        self.vis_detail_layer = DetailFeatureExtraction()
-        self.ir_detail_layer  = DetailFeatureExtraction()
+        self.base_layer   = BaseFeatureExtraction(dim=dim, num_heads = heads[2])
+        self.detail_layer = DetailFeatureExtraction()
+        
 
     def forward(self, vis_img, ir_img):
         vis_patch = self.patch_embed(vis_img)
@@ -488,12 +484,11 @@ class Restormer_Encoder(nn.Module):
         vis_coatt_feat, ir_coatt_feat = self.coatt_layer([vis_att_feat, ir_att_feat])
         vis_base_feat = self.base_layer(vis_coatt_feat)
         ir_base_feat  = self.base_layer(ir_coatt_feat)
-        vis_detail_feat = self.vis_detail_layer(vis_coatt_feat)
-        ir_detail_feat  = self.ir_detail_layer(ir_coatt_feat)
-        return vis_feat_shared, vis_base_feat, vis_detail_feat, \
-                ir_feat_shared, ir_base_feat, ir_detail_feat
+        vis_detail_feat = self.detail_layer(vis_coatt_feat)
+        ir_detail_feat  = self.detail_layer(ir_coatt_feat)
+        return vis_base_feat, vis_detail_feat, ir_base_feat, ir_detail_feat
 
-class Restormer_Decoder(nn.Module):
+class RestormerDecoder(nn.Module):
     def __init__(self,
                  inp_channels=1,
                  out_channels=1,
@@ -505,17 +500,15 @@ class Restormer_Decoder(nn.Module):
                  LayerNorm_type='WithBias',
                  ):
 
-        super(Restormer_Decoder, self).__init__()
-        self.reduce_channel = nn.Conv2d(
-            int(dim*2), int(dim), kernel_size=1, bias=bias)
+        super(RestormerDecoder, self).__init__()
+        self.reduce_channel = nn.Conv2d(int(dim*2), int(dim), kernel_size=1, bias=bias)
         self.enc_l2 = nn.Sequential(*[TransformerBlock(dim=dim, num_heads=heads[1], ffn_expand_factor=ffn_expand_factor,
                                             bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[1])])
         self.output = nn.Sequential(
-            nn.Conv2d(int(dim), int(dim)//2, kernel_size=3,
-                      stride=1, padding=1, bias=bias),
-            nn.LeakyReLU(),
-            nn.Conv2d(int(dim)//2, out_channels, kernel_size=3,
-                      stride=1, padding=1, bias=bias),)
+                nn.Conv2d(int(dim), int(dim)//2, kernel_size=3, stride=1, padding=1, bias=bias),
+                nn.LeakyReLU(),
+                nn.Conv2d(int(dim)//2, out_channels, kernel_size=3, stride=1, padding=1, bias=bias)
+            )
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, inp_img, base_feature, detail_feature):
@@ -529,34 +522,62 @@ class Restormer_Decoder(nn.Module):
         return self.sigmoid(out_enc_level1), out_enc_level0
 
 
+class RestormerAutoEncoder(nn.Module):
+    def __init__(self,
+                 inp_channels=1,
+                 out_channels=1,
+                 dim=64,
+                 num_blocks=[2, 2, 2],
+                 heads=[8, 8, 8],
+                 ffn_expand_factor=2,
+                 bias=False,
+                 LayerNorm_type='WithBias',
+                 ):
+        super(RestormerAutoEncoder, self).__init__()
+
+        self.encoder = RestormerEncoder(inp_channels, out_channels, dim, num_blocks, heads, 
+                                        ffn_expand_factor, bias, LayerNorm_type)
+        self.decoder = RestormerDecoder(inp_channels, out_channels, dim, num_blocks, heads, 
+                                        ffn_expand_factor, bias, LayerNorm_type)
+
+        self.base_fuse = BaseFeatureExtraction(dim=dim, num_heads = heads[2])
+        self.detail_fuse = DetailFeatureExtraction()
+    
+    def forward(self, vis_img, ir_img):
+        vis_base_feat, vis_detail_feat, ir_base_feat, ir_detail_feat = self.encoder(vis_img, ir_img) 
+        fuse_base_feat   = self.base_fuse(vis_base_feat + ir_base_feat)
+        fuse_detail_feat = self.detail_fuse(vis_detail_feat + ir_detail_feat)
+        fuse_img, _    = self.decoder(vis_img, fuse_base_feat, fuse_detail_feat)
+
+        if self.training:
+            rec_vis_img, _ = self.decoder(vis_img, vis_base_feat, vis_detail_feat)
+            rec_ir_img, _  = self.decoder(ir_img, ir_base_feat, ir_detail_feat)
+            return rec_vis_img, vis_base_feat, vis_detail_feat, \
+                    rec_ir_img, ir_base_feat, ir_detail_feat, \
+                    fuse_img
+        else:
+            return fuse_img
+
+
 if __name__ == '__main__':
-    height = 128
-    width = 128
-    window_size = 8
+    h, w = 128, 128
+    vis_img, ir_img = torch.randn(1, 1, h, w), torch.randn(1, 1, h, w)
 
-    vis_img = torch.randn(1, 1, 128, 128)
-    ir_img  = torch.randn(1, 1, 128, 128)
-
-    encoder = Restormer_Encoder()
-    decoder = Restormer_Decoder()
+    restormer_ae_model = RestormerAutoEncoder()
 
     if torch.cuda.is_available():
-        encoder = encoder.cuda()
-        decoder = decoder.cuda()
-        vis_img = vis_img.cuda()
-        ir_img  = ir_img.cuda()
+        vis_img, ir_img = vis_img.cuda(), ir_img.cuda()
+        restormer_ae_model = restormer_ae_model.cuda()
 
+    restormer_ae_model.train()
     import time
-
     start_time = time.time()
     for i in range(30):
-        vis_feat_shared, vis_base_feat, vis_detail_feat, \
-                ir_feat_shared, ir_base_feat, ir_detail_feat = encoder(vis_img, ir_img) 
-    
+        rec_vis_img, vis_base_feat, vis_detail_feat, \
+                rec_ir_img, ir_base_feat, ir_detail_feat, fuse_img = \
+                restormer_ae_model(vis_img, ir_img)
         print(f"time: {time.time()-start_time}")
         start_time = time.time()
-    
-    
     import pdb
     pdb.set_trace()
         
