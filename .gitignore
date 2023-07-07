@@ -1,4 +1,7 @@
 __pycache__
+dehaze_data/
+fusion_data/
+detect_data/
 dehaze_demo/
 *.mp4
 *.tar
