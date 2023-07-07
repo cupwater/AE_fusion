@@ -1,11 +1,11 @@
 common:
     arch: RestormerAutoEncoder
     workers: 4
-    train_batch: 64
-    test_batch: 32
+    train_batch: 8
+    test_batch: 8
     shuffle_strategy: 1
-    lr: 0.001
-    gamma: 0.1
+    lr: 0.0001
+    gamma: 0.5
     epoch: 30
     scheduler: [15, 25]
     momentum: 0.9
@@ -15,12 +15,12 @@ common:
     save_path: 'experiments/restormer_coa_fusion'
 
 loss_config:
-    bg_dif:
-        type: L1Loss
-        weight: 1
-    detail_dif:
-        type: L1Loss
-        weight: -1
+    # bg_dif:
+    #     type: L1Loss
+    #     weight: 1
+    # detail_dif:
+    #     type: L1Loss
+    #     weight: -1
     vis_rec:
         type: MS_SSIMLoss
         weight: 5
@@ -30,11 +30,17 @@ loss_config:
     vis_gradient:
         type: GradientL1Loss
         weight: 5
+    decomp:
+        type: DeCompositionLoss
+        weight: 2
+    fusion:
+        type: FusionLoss
+        weight: 1
 
 dataset : 
     crop_size: 128
     final_size: 128
-    type: VisibleInfraredPairDataset
+    type: VisibleInfrared1CPairDataset
     train_list: 'data/train_list.txt'
     test_list: 'data/train_list.txt'
     prefix: 'data/train_vis_ir_images'

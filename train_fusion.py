@@ -82,13 +82,16 @@ def main(config_file, is_eval):
         weight = loss_dict['weight']
         criterion_list.append([criterion, weight, loss_key])
 
-    optimizer = torch.optim.SGD(
-        filter(
-            lambda p: p.requires_grad,
-            model.parameters()),
-        lr=common_config['lr'],
-        momentum=0.9,
-        weight_decay=common_config['weight_decay'])
+    optimizer = torch.optim.Adam(model.parameters(), lr=common_config['lr'], \
+                                  weight_decay=common_config['weight_decay'])
+    # optimizer = torch.optim.SGD(
+    #     filter(
+    #         lambda p: p.requires_grad,
+    #         model.parameters()),
+    #     lr=common_config['lr'],
+    #     momentum=0.9,
+    #     weight_decay=common_config['weight_decay'])
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=common_config['gamma'])
 
     # logger
     logger = Logger(os.path.join(common_config['save_path'], 'log.txt'))
@@ -108,7 +111,7 @@ def main(config_file, is_eval):
               (epoch + 1, common_config['epoch'], state['lr']))
         bg_diff, detail_diff, vis_rec, ir_rec, vis_gradient, loss = \
                             train(trainloader, model, criterion_list, optimizer, \
-                                  use_cuda, epoch, common_config['print_interval'])
+                                  use_cuda, epoch, scheduler, common_config['print_interval'])
         # append logger file
         logger.append([state['lr'], bg_diff, detail_diff,
                       vis_rec, ir_rec, vis_gradient, loss])
@@ -122,7 +125,7 @@ def main(config_file, is_eval):
     logger.close()
 
 
-def train(trainloader, model, criterion_list, optimizer, use_cuda, epoch, print_interval=100):
+def train(trainloader, model, criterion_list, optimizer, use_cuda, epoch, scheduler, print_interval=100):
     # switch to train mode
     model.train()
 
@@ -181,6 +184,8 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda, epoch, print_
         optimizer.zero_grad()
         all_loss.backward()
         optimizer.step()
+
+        scheduler.step()
 
         if batch_idx % print_interval == 0:
             print("iter/epoch: %d / %d \t bg_dif: %.3f \t detail_dif: %.3f, \

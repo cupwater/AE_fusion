@@ -25,7 +25,7 @@ __all__ = ['L1Loss',
            'BCEFocalLoss',
            'FocalLoss',
            'DeCompositionLoss',
-           'Fusionloss',
+           'FusionLoss',
         ]
 
 
@@ -231,9 +231,9 @@ class Sobelxy(nn.Module):
         return torch.abs(sobelx)+torch.abs(sobely)
 
 
-class Fusionloss(nn.Module):
+class FusionLoss(nn.Module):
     def __init__(self):
-        super(Fusionloss, self).__init__()
+        super(FusionLoss, self).__init__()
         self.sobelconv = Sobelxy()
 
     def forward(self, image_vis, image_ir, generate_img):
@@ -246,4 +246,4 @@ class Fusionloss(nn.Module):
         x_grad_joint = torch.max(y_grad, ir_grad)
         loss_grad = F.l1_loss(x_grad_joint, generate_img_grad)
         loss_total = loss_in+10*loss_grad
-        return loss_total, loss_in, loss_grad
+        return loss_total #, loss_in, loss_grad
