@@ -78,7 +78,8 @@ class AutoEncoder(nn.Module):
         if self.training:
             out_vis = self.decoder(vis_feat1, vis_feat2, vis_feat_bg, vis_feat_detail)
             out_ir  = self.decoder(ir_feat1,  ir_feat2,  ir_feat_bg,  ir_feat_detail)
-            return out_vis, vis_feat_bg, vis_feat_detail, out_ir, ir_feat_bg, ir_feat_detail
+            return out_vis, vis_feat_bg, vis_feat_detail, \
+                        out_ir, ir_feat_bg, ir_feat_detail, None
         else:
             if self.fuse_mode == 'Sum':
                 feat_bg     = ir_feat_bg + vis_feat_bg

@@ -145,7 +145,7 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda, epoch, print_
         if use_cuda:
             vis_input, ir_input = vis_input.cuda(), ir_input.cuda()
         out_vis, vis_feat_bg, vis_feat_detail, out_ir, \
-            ir_feat_bg, ir_feat_detail = model(vis_input, ir_input)
+            ir_feat_bg, ir_feat_detail, out_fuse = model(vis_input, ir_input)
 
         all_loss = 0
         for loss_fun, weight, loss_key in criterion_list:
@@ -165,6 +165,12 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda, epoch, print_
                 ir_rec.update(temp_loss)
             elif loss_key == 'vis_gradient':
                 temp_loss = weight * loss_fun(vis_input, out_vis)
+                vis_gradient.update(temp_loss)
+            elif loss_key == 'decomp':
+                temp_loss = weight * loss_fun(vis_feat_bg, vis_feat_detail, ir_feat_bg, ir_feat_detail)
+                vis_gradient.update(temp_loss)
+            elif loss_key == 'fusion':
+                temp_loss = weight * loss_fun(out_vis, out_ir, out_fuse)
                 vis_gradient.update(temp_loss)
             else:
                 print("error, no such loss")
