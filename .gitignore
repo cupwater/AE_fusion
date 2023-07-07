@@ -1,4 +1,5 @@
 __pycache__
+dehaze_demo/
 *.mp4
 *.tar
 *.jpg
