@@ -14,18 +14,15 @@ import torch.onnx
 import numpy as np
 from skimage.io import imsave
 
-import pdb
-
 import models
 import dataset
 import losses
 from augmentation.augment import TrainTransform, TestTransform
-from utils import Logger, AverageMeter, mkdir_p, progress_bar
+from utils import Logger, AverageMeter, mkdir_p, progress_bar, Evaluator
 
 state = {}
 best_loss = 999
 use_cuda = True
-
 
 def main(config_file, is_eval):
     global state, best_loss, use_cuda
@@ -49,15 +46,12 @@ def main(config_file, is_eval):
     print('==> Preparing dataset %s' % data_config['type'])
 
     # create dataset for training and testing
-    trainset = dataset.__dict__[data_config['type']](
+    trainset = dataset.__dict__[data_config['train_type']](
         data_config['train_list'], transform_train,
         prefix=data_config['prefix'])
-    testset = dataset.__dict__[data_config['type']](
-        data_config['test_list'], transform=None,
+    testset = dataset.__dict__[data_config['test_type']](
+        data_config['test_list'], transform_test,
         prefix=data_config['prefix'])
-    # testset = dataset.__dict__[data_config['type']](
-    #     data_config['test_list'], transform_test,
-    #     prefix=data_config['prefix'])
 
     # create dataloader for training and testing
     trainloader = torch.utils.data.DataLoader(
@@ -68,8 +62,6 @@ def main(config_file, is_eval):
     # Model
     print("==> creating model '{}'".format(common_config['arch']))
     model = models.__dict__[common_config['arch']]()
-    # model.load_state_dict(torch.load(common_config['pretrained_weights'])[
-    #                       'state_dict'], strict=False)
     if use_cuda:
         model = model.cuda()
     torch.backends.cudnn.benchmark = True
@@ -79,9 +71,10 @@ def main(config_file, is_eval):
     criterion_list = []
     for loss_key, loss_dict in config['loss_config'].items():
         criterion = losses.__dict__[loss_dict['type']]()
+        if use_cuda:
+            criterion = criterion.cuda()
         weight = loss_dict['weight']
         criterion_list.append([criterion, weight, loss_key])
-
     optimizer = torch.optim.Adam(model.parameters(), lr=common_config['lr'], \
                                   weight_decay=common_config['weight_decay'])
     # optimizer = torch.optim.SGD(
@@ -91,7 +84,6 @@ def main(config_file, is_eval):
     #     lr=common_config['lr'],
     #     momentum=0.9,
     #     weight_decay=common_config['weight_decay'])
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=common_config['gamma'])
 
     # logger
     logger = Logger(os.path.join(common_config['save_path'], 'log.txt'))
@@ -111,7 +103,7 @@ def main(config_file, is_eval):
               (epoch + 1, common_config['epoch'], state['lr']))
         bg_diff, detail_diff, vis_rec, ir_rec, vis_gradient, loss = \
                             train(trainloader, model, criterion_list, optimizer, \
-                                  use_cuda, epoch, scheduler, common_config['print_interval'])
+                                  use_cuda, epoch, common_config['print_interval'])
         # append logger file
         logger.append([state['lr'], bg_diff, detail_diff,
                       vis_rec, ir_rec, vis_gradient, loss])
@@ -121,11 +113,11 @@ def main(config_file, is_eval):
             'state_dict': model.state_dict(),
         }, loss < best_loss, save_path=common_config['save_path'])
 
-    test(testloader, model, criterion_list, use_cuda)
+    # test(testloader, model, common_config['save_path'], use_cuda)
     logger.close()
 
 
-def train(trainloader, model, criterion_list, optimizer, use_cuda, epoch, scheduler, print_interval=100):
+def train(trainloader, model, criterion_list, optimizer, use_cuda, epoch, print_interval=100):
     # switch to train mode
     model.train()
 
@@ -185,8 +177,6 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda, epoch, schedu
         all_loss.backward()
         optimizer.step()
 
-        scheduler.step()
-
         if batch_idx % print_interval == 0:
             print("iter/epoch: %d / %d \t bg_dif: %.3f \t detail_dif: %.3f, \
                     vis_rec: %.3f \t ir_rec: %.3f \t vis_gradient: %.3f \t losses: %.3f" % (
@@ -201,7 +191,7 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda, epoch, schedu
             ir_rec.avg, vis_gradient.avg, losses.avg)
 
 
-def test(testloader, model, criterion, use_cuda):
+def test(testloader, model, save_path, use_cuda):
     global best_loss
     # switch to evaluate mode
     model.eval()
@@ -211,23 +201,40 @@ def test(testloader, model, criterion, use_cuda):
     end = time.time()
 
     model.eval()
-    for batch_idx, (vis_input, ir_input) in enumerate(testloader):
+    for batch_idx, (vis_input, ir_input, vis_img, ir_img) in enumerate(testloader):
         # measure data loading time
         data_time.update(time.time() - end)
         if use_cuda:
             vis_input, ir_input = vis_input.cuda(), ir_input.cuda()
-
         fuse_out = model(vis_input, ir_input).cpu().detach().numpy()
+
         for idx in range(fuse_out.shape[0]):
-            img = np.transpose(fuse_out[idx], (1, 2, 0))
-            imsave(f"data/fusion/test_results/{batch_idx}_{idx}.jpg", img)
+            fuse_img = np.transpose(fuse_out[idx], (1, 2, 0))
+            imsave(f"{save_path}/{batch_idx}_{idx}.jpg", fuse_img)
+
+            metric_result += np.array([Evaluator.EN(fuse_img), Evaluator.SD(fuse_img),
+                            Evaluator.SF(fuse_img), Evaluator.MI(fuse_img, ir_img, vis_img),
+                            Evaluator.SCD(fuse_img, ir_img, vis_img), Evaluator.VIFF(fuse_img, ir_img, vis_img),
+                            Evaluator.Qabf(fuse_img, ir_img, vis_img), Evaluator.SSIM(fuse_img, ir_img, vis_img)])
 
         progress_bar(batch_idx, len(testloader))
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
-    return (losses.avg)
 
+    metric_result /= len(testloader)
+    print("EN\t SD\t SF\t MI\tSCD\tVIF\tQabf\tSSIM")
+    print(str(np.round(metric_result[0], 2))+'\t'
+            +str(np.round(metric_result[1], 2))+'\t'
+            +str(np.round(metric_result[2], 2))+'\t'
+            +str(np.round(metric_result[3], 2))+'\t'
+            +str(np.round(metric_result[4], 2))+'\t'
+            +str(np.round(metric_result[5], 2))+'\t'
+            +str(np.round(metric_result[6], 2))+'\t'
+            +str(np.round(metric_result[7], 2))
+            )
+    print("="*80)
+    return (losses.avg)
 
 def save_checkpoint(state, is_best, save_path, filename='checkpoint.pth.tar'):
     filepath = os.path.join(save_path, filename)

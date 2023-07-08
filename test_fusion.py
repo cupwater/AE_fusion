@@ -11,6 +11,7 @@ import numpy as np
 import onnxruntime as ort
 from crop_fuse import fusion_imgs, crop_tetragon
 
+
 def fuse_vis_ir(vis_image, ir_image, ort_session, input_size=(512, 640)):    
     input_name_1 = ort_session.get_inputs()[0].name
     input_name_2 = ort_session.get_inputs()[1].name
@@ -29,6 +30,7 @@ def fuse_vis_ir(vis_image, ir_image, ort_session, input_size=(512, 640)):
     ir_input  = _preprocess(ir_image)
     fuse_image = ort_session.run(None, {input_name_1: vis_input, input_name_2: ir_input})
     return fuse_image
+
 
 if __name__ == '__main__':
     onnx_path = "experiments/template/ae_fusion.onnx"

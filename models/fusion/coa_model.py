@@ -444,8 +444,8 @@ class OverlapPatchEmbed(nn.Module):
 
 class RestormerEncoder(nn.Module):
     def __init__(self,
-                 inp_channels=3,
-                 out_channels=3,
+                 inp_channels=1,
+                 out_channels=1,
                  dim=64,
                  num_blocks=[2, 2, 2],
                  heads=[8, 8, 8],
@@ -490,8 +490,8 @@ class RestormerEncoder(nn.Module):
 
 class RestormerDecoder(nn.Module):
     def __init__(self,
-                 inp_channels=3,
-                 out_channels=3,
+                 inp_channels=1,
+                 out_channels=1,
                  dim=64,
                  num_blocks=[4, 4],
                  heads=[8, 8, 8],
@@ -524,8 +524,8 @@ class RestormerDecoder(nn.Module):
 
 class RestormerAutoEncoder(nn.Module):
     def __init__(self,
-                 inp_channels=3,
-                 out_channels=3,
+                 inp_channels=1,
+                 out_channels=1,
                  dim=64,
                  num_blocks=[2, 2, 2],
                  heads=[8, 8, 8],
@@ -561,7 +561,7 @@ class RestormerAutoEncoder(nn.Module):
 
 if __name__ == '__main__':
     h, w = 128, 128
-    vis_img, ir_img = torch.randn(1, 3, h, w), torch.randn(1, 3, h, w)
+    vis_img, ir_img = torch.randn(1, 1, h, w), torch.randn(1, 1, h, w)
 
     restormer_ae_model = RestormerAutoEncoder()
 
