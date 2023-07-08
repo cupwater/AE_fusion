@@ -1,6 +1,8 @@
 __pycache__
 dehaze_data/
 fusion_data/
+*.out
+*.sh
 detect_data/
 dehaze_demo/
 *.mp4

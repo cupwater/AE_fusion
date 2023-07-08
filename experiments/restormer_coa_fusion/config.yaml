@@ -2,7 +2,7 @@ common:
     arch: RestormerAutoEncoder
     workers: 4
     train_batch: 8
-    test_batch: 8
+    test_batch: 1
     shuffle_strategy: 1
     lr: 0.0001
     gamma: 0.5
@@ -38,5 +38,6 @@ dataset :
     train_list: 'data/MSRS_train_imgsize_64_stride_100.h5'
 
     test_type: VisibleInfraredTestDataset
-    test_list: 'data/MSRS_test_imgsize_64_stride_100.h5'
-    prefix: 'data/test_vis_ir_images'
+    test_list: 'data/MSRS_test'
+
+    prefix: 'data/MSRS_test'

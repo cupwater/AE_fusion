@@ -9,6 +9,7 @@ import os
 import shutil
 import time
 import yaml
+import pdb
 import torch
 import torch.onnx
 import numpy as np
@@ -43,14 +44,14 @@ def main(config_file, is_eval):
     transform_test = TestTransform(
         crop_size=data_config['crop_size'], final_size=data_config['final_size'])
 
-    print('==> Preparing dataset %s' % data_config['type'])
+    print('==> Preparing dataset %s' % data_config['train_type'])
 
     # create dataset for training and testing
-    trainset = dataset.__dict__[data_config['train_type']](
-        data_config['train_list'], transform_train,
-        prefix=data_config['prefix'])
     testset = dataset.__dict__[data_config['test_type']](
         data_config['test_list'], transform_test,
+        prefix=data_config['prefix'])
+    trainset = dataset.__dict__[data_config['train_type']](
+        data_config['train_list'], transform_train,
         prefix=data_config['prefix'])
 
     # create dataloader for training and testing
@@ -61,7 +62,7 @@ def main(config_file, is_eval):
 
     # Model
     print("==> creating model '{}'".format(common_config['arch']))
-    model = models.__dict__[common_config['arch']]()
+    model = models.__dict__[common_config['arch']](dim=16)
     if use_cuda:
         model = model.cuda()
     torch.backends.cudnn.benchmark = True
@@ -93,12 +94,13 @@ def main(config_file, is_eval):
     if is_eval:
         model.load_state_dict(torch.load(os.path.join(
             common_config['save_path'], 'checkpoint.pth.tar'))['state_dict'], strict=True)
-        test(testloader, model, criterion_list, use_cuda)
+        test(testloader, model, common_config['save_path'], use_cuda)
         return
 
     # Train and val
     for epoch in range(common_config['epoch']):
         adjust_learning_rate(optimizer, epoch, common_config)
+        test(testloader, model, common_config['save_path'], use_cuda)
         print('\nEpoch: [%d | %d] LR: %f' %
               (epoch + 1, common_config['epoch'], state['lr']))
         bg_diff, detail_diff, vis_rec, ir_rec, vis_gradient, loss = \
@@ -113,7 +115,6 @@ def main(config_file, is_eval):
             'state_dict': model.state_dict(),
         }, loss < best_loss, save_path=common_config['save_path'])
 
-    # test(testloader, model, common_config['save_path'], use_cuda)
     logger.close()
 
 
@@ -139,6 +140,7 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda, epoch, print_
         data_time.update(time.time() - end)
         if use_cuda:
             vis_input, ir_input = vis_input.cuda(), ir_input.cuda()
+
         out_vis, vis_feat_bg, vis_feat_detail, out_ir, \
             ir_feat_bg, ir_feat_detail, out_fuse = model(vis_input, ir_input)
 
@@ -199,23 +201,25 @@ def test(testloader, model, save_path, use_cuda):
     data_time = AverageMeter()
     losses = AverageMeter()
     end = time.time()
+    metric_result = np.zeros((8))
 
     model.eval()
-    for batch_idx, (vis_input, ir_input, vis_img, ir_img) in enumerate(testloader):
+    for batch_idx, (vis_input, ir_input, vis_imgs, ir_imgs) in enumerate(testloader):
         # measure data loading time
         data_time.update(time.time() - end)
         if use_cuda:
             vis_input, ir_input = vis_input.cuda(), ir_input.cuda()
+        
         fuse_out = model(vis_input, ir_input).cpu().detach().numpy()
 
         for idx in range(fuse_out.shape[0]):
             fuse_img = np.transpose(fuse_out[idx], (1, 2, 0))
-            imsave(f"{save_path}/{batch_idx}_{idx}.jpg", fuse_img)
+            #imsave(f"{save_path}/{batch_idx}_{idx}.jpg", fuse_img)
 
             metric_result += np.array([Evaluator.EN(fuse_img), Evaluator.SD(fuse_img),
-                            Evaluator.SF(fuse_img), Evaluator.MI(fuse_img, ir_img, vis_img),
-                            Evaluator.SCD(fuse_img, ir_img, vis_img), Evaluator.VIFF(fuse_img, ir_img, vis_img),
-                            Evaluator.Qabf(fuse_img, ir_img, vis_img), Evaluator.SSIM(fuse_img, ir_img, vis_img)])
+                            Evaluator.SF(fuse_img), Evaluator.MI(fuse_img, ir_imgs[idx], vis_imgs[idx]),
+                            Evaluator.SCD(fuse_img, ir_imgs[idx], vis_imgs[idx]), Evaluator.VIFF(fuse_img, ir_imgs[idx], vis_imgs[idx]),
+                            Evaluator.Qabf(fuse_img, ir_imgs[idx], vis_imgs[idx]), Evaluator.SSIM(fuse_img, ir_imgs[idx], vis_imgs[idx])])
 
         progress_bar(batch_idx, len(testloader))
         # measure elapsed time

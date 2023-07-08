@@ -28,15 +28,18 @@ def image_read_cv2(path, mode='RGB'):
 
 class VisibleInfraredTestDataset(Dataset):
     def __init__(self, imglist_path, transform, prefix='data/'):
-        self.data_list = self._read_all_data_(prefix)
+        self.data_list = self._read_all_data_(imglist_path)
 
     def _read_all_data_(self, prefix):
         data_list = []
         for img_name in os.listdir(os.path.join(prefix, "ir")):
             vis_img = image_read_cv2(os.path.join(prefix, "vi", img_name), mode='GRAY')
-            vis_process = vis_img[np.newaxis, ...]/255.0
-
             ir_img = image_read_cv2(os.path.join(prefix, "ir", img_name),mode='GRAY')
+
+            vis_img = cv2.resize(vis_img, (240, 320))
+            ir_img = cv2.resize(ir_img, (240, 320))
+
+            vis_process = vis_img[np.newaxis, ...]/255.0
             ir_process = ir_img[np.newaxis, ...]/255.0
 
             data_list.append((vis_process, vis_img, ir_process, ir_img))

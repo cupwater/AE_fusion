@@ -157,14 +157,22 @@ class InvertedResidualBlock(nn.Module):
 
 
 class DetailNode(nn.Module):
-    def __init__(self):
+    def __init__(self, inp):
         super(DetailNode, self).__init__()
         # Scale is Ax + b, i.e. affine transformation
-        self.theta_phi = InvertedResidualBlock(inp=32, oup=32, expand_ratio=2)
-        self.theta_rho = InvertedResidualBlock(inp=32, oup=32, expand_ratio=2)
-        self.theta_eta = InvertedResidualBlock(inp=32, oup=32, expand_ratio=2)
-        self.shffleconv = nn.Conv2d(64, 64, kernel_size=1,
+
+        self.inp = inp
+        self.theta_phi = InvertedResidualBlock(inp=inp//2, oup=inp//2, expand_ratio=2)
+        self.theta_rho = InvertedResidualBlock(inp=inp//2, oup=inp//2, expand_ratio=2)
+        self.theta_eta = InvertedResidualBlock(inp=inp//2, oup=inp//2, expand_ratio=2)
+        self.shffleconv = nn.Conv2d(inp, inp, kernel_size=1,
                                     stride=1, padding=0, bias=True)
+
+        #self.theta_phi = InvertedResidualBlock(inp=32, oup=32, expand_ratio=2)
+        #self.theta_rho = InvertedResidualBlock(inp=32, oup=32, expand_ratio=2)
+        #self.theta_eta = InvertedResidualBlock(inp=32, oup=32, expand_ratio=2)
+        #self.shffleconv = nn.Conv2d(64, 64, kernel_size=1,
+        #                            stride=1, padding=0, bias=True)
 
     def separateFeature(self, x):
         z1, z2 = x[:, :x.shape[1]//2], x[:, x.shape[1]//2:x.shape[1]]
@@ -179,9 +187,9 @@ class DetailNode(nn.Module):
 
 
 class DetailFeatureExtraction(nn.Module):
-    def __init__(self, num_layers=3):
+    def __init__(self, inp=16, num_layers=3):
         super(DetailFeatureExtraction, self).__init__()
-        INNmodules = [DetailNode() for _ in range(num_layers)]
+        INNmodules = [DetailNode(inp) for _ in range(num_layers)]
         self.net = nn.Sequential(*INNmodules)
 
     def forward(self, x):
@@ -468,7 +476,7 @@ class RestormerEncoder(nn.Module):
         self.coatt_layer = nn.Sequential(*[CrossModalityBlock(dim=dim, num_heads=heads[1], ffn_expand_factor=ffn_expand_factor,
                                     bias=bias, LayerNorm_type=LayerNorm_type) for _ in range(num_blocks[2])]) 
         self.base_layer   = BaseFeatureExtraction(dim=dim, num_heads = heads[2])
-        self.detail_layer = DetailFeatureExtraction()
+        self.detail_layer = DetailFeatureExtraction(inp=dim)
         
 
     def forward(self, vis_img, ir_img):
@@ -526,7 +534,7 @@ class RestormerAutoEncoder(nn.Module):
     def __init__(self,
                  inp_channels=1,
                  out_channels=1,
-                 dim=64,
+                 dim=16,
                  num_blocks=[2, 2, 2],
                  heads=[8, 8, 8],
                  ffn_expand_factor=2,
@@ -541,7 +549,7 @@ class RestormerAutoEncoder(nn.Module):
                                         ffn_expand_factor, bias, LayerNorm_type)
 
         self.base_fuse = BaseFeatureExtraction(dim=dim, num_heads = heads[2])
-        self.detail_fuse = DetailFeatureExtraction()
+        self.detail_fuse = DetailFeatureExtraction(inp=dim)
     
     def forward(self, vis_img, ir_img):
         vis_base_feat, vis_detail_feat, ir_base_feat, ir_detail_feat = self.encoder(vis_img, ir_img) 
@@ -563,7 +571,7 @@ if __name__ == '__main__':
     h, w = 128, 128
     vis_img, ir_img = torch.randn(1, 1, h, w), torch.randn(1, 1, h, w)
 
-    restormer_ae_model = RestormerAutoEncoder()
+    restormer_ae_model = RestormerAutoEncoder(dim=16)
 
     if torch.cuda.is_available():
         vis_img, ir_img = vis_img.cuda(), ir_img.cuda()

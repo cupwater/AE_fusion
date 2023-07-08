@@ -1,5 +1,6 @@
 import os
 import h5py
+import pdb
 import numpy as np
 from tqdm import tqdm
 from skimage.io import imread
@@ -39,17 +40,19 @@ def is_low_contrast(image, fraction_threshold=0.1, lower_percentile=10,
     return ratio < fraction_threshold
 
 
-data_name = "MSRS_train"
+data_name = "/home/znzhang2/datasets/Infrared/MSRS/train"
+#img_size = 128  # patch size
+#stride = 200  # patch stride
 img_size = 128  # patch size
 stride = 200  # patch stride
 
-IR_files = sorted(get_img_file(r"MSRS_train/ir"))
-VIS_files = sorted(get_img_file(r"MSRS_train/vi"))
+IR_files = sorted(get_img_file(f"{data_name}/ir"))
+VIS_files = sorted(get_img_file(f"{data_name}/vi"))
 
 assert len(IR_files) == len(VIS_files)
 h5py_file = data_name+'_imgsize_'+str(img_size)+"_stride_"+str(stride)+'.h5'
 
-h5f = h5py.File(os.path.join('.\\data', h5py_file), 'w')
+h5f = h5py.File(os.path.join('./data', h5py_file), 'w')
 h5_ir = h5f.create_group('ir_patchs')
 h5_vis = h5f.create_group('vis_patchs')
 train_num = 0
