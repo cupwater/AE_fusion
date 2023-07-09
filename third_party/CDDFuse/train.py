@@ -37,7 +37,7 @@ epoch_gap = 40  # epoches of Phase I
 
 lr = 1e-4
 weight_decay = 0
-batch_size = 32
+batch_size = 16
 GPU_number = os.environ['CUDA_VISIBLE_DEVICES']
 # Coefficients of the loss function
 coeff_mse_loss_VF = 1. # alpha1
@@ -50,12 +50,14 @@ optim_step = 20
 optim_gamma = 0.5
 
 
+
+model_dim = 16
 # Model
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-DIDF_Encoder = nn.DataParallel(Restormer_Encoder(dim=16)).to(device)
-DIDF_Decoder = nn.DataParallel(Restormer_Decoder(dim=16)).to(device)
-BaseFuseLayer = nn.DataParallel(BaseFeatureExtraction(dim=16, num_heads=8)).to(device)
-DetailFuseLayer = nn.DataParallel(DetailFeatureExtraction(num_layers=1, dim=16)).to(device)
+DIDF_Encoder = nn.DataParallel(Restormer_Encoder(dim=model_dim)).to(device)
+DIDF_Decoder = nn.DataParallel(Restormer_Decoder(dim=model_dim)).to(device)
+BaseFuseLayer = nn.DataParallel(BaseFeatureExtraction(dim=model_dim, num_heads=8)).to(device)
+DetailFuseLayer = nn.DataParallel(DetailFeatureExtraction(num_layers=1, dim=model_dim)).to(device)
 
 # optimizer, scheduler and loss function
 optimizer1 = torch.optim.Adam(
@@ -118,7 +120,7 @@ class AverageMeter(object):
 
 
 # logger
-logger = Logger(os.path.join('models_16channels', 'log.txt'))
+logger = Logger(os.path.join(f"models_channel{model_dim}", 'log.txt'))
 logger.set_names(['decomp', 'fusion', 'vis_rec', 'ir_rec', 'vis_gradient', 'loss'])
 
 
@@ -263,6 +265,6 @@ if True:
         'BaseFuseLayer': BaseFuseLayer.state_dict(),
         'DetailFuseLayer': DetailFuseLayer.state_dict(),
     }
-    torch.save(checkpoint, os.path.join("models_16channel/CDDFuse_"+timestamp+'.pth'))
+    torch.save(checkpoint, os.path.join(f"models_channel{model_dim}/CDDFuse_"+timestamp+'.pth'))
 
 
