@@ -1,4 +1,6 @@
 __pycache__
+*.jpg
+*.txt
 dehaze_data/
 fusion_data/
 *.out

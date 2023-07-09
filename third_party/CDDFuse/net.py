@@ -146,13 +146,13 @@ class InvertedResidualBlock(nn.Module):
         return self.bottleneckBlock(x)
 
 class DetailNode(nn.Module):
-    def __init__(self):
+    def __init__(self, dim=64):
         super(DetailNode, self).__init__()
         # Scale is Ax + b, i.e. affine transformation
-        self.theta_phi = InvertedResidualBlock(inp=32, oup=32, expand_ratio=2)
-        self.theta_rho = InvertedResidualBlock(inp=32, oup=32, expand_ratio=2)
-        self.theta_eta = InvertedResidualBlock(inp=32, oup=32, expand_ratio=2)
-        self.shffleconv = nn.Conv2d(64, 64, kernel_size=1,
+        self.theta_phi = InvertedResidualBlock(inp=dim//2, oup=dim//2, expand_ratio=2)
+        self.theta_rho = InvertedResidualBlock(inp=dim//2, oup=dim//2, expand_ratio=2)
+        self.theta_eta = InvertedResidualBlock(inp=dim//2, oup=dim//2, expand_ratio=2)
+        self.shffleconv = nn.Conv2d(dim, dim, kernel_size=1,
                                     stride=1, padding=0, bias=True)
     def separateFeature(self, x):
         z1, z2 = x[:, :x.shape[1]//2], x[:, x.shape[1]//2:x.shape[1]]
@@ -165,9 +165,9 @@ class DetailNode(nn.Module):
         return z1, z2
 
 class DetailFeatureExtraction(nn.Module):
-    def __init__(self, num_layers=3):
+    def __init__(self, num_layers=3, dim=64):
         super(DetailFeatureExtraction, self).__init__()
-        INNmodules = [DetailNode() for _ in range(num_layers)]
+        INNmodules = [DetailNode(dim=dim) for _ in range(num_layers)]
         self.net = nn.Sequential(*INNmodules)
     def forward(self, x):
         z1, z2 = x[:, :x.shape[1]//2], x[:, x.shape[1]//2:x.shape[1]]
@@ -352,7 +352,7 @@ class Restormer_Encoder(nn.Module):
         self.encoder_level1 = nn.Sequential(*[TransformerBlock(dim=dim, num_heads=heads[0], ffn_expansion_factor=ffn_expansion_factor,
                                             bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[0])])
         self.baseFeature = BaseFeatureExtraction(dim=dim, num_heads = heads[2])
-        self.detailFeature = DetailFeatureExtraction()
+        self.detailFeature = DetailFeatureExtraction(dim=dim)
              
     def forward(self, inp_img):
         inp_enc_level1 = self.patch_embed(inp_img)

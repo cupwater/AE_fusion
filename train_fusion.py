@@ -181,6 +181,7 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda, epoch, print_
         # compute gradient and do SGD step
         optimizer.zero_grad()
         all_loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.01, norm_type=2)
         optimizer.step()
 
         if batch_idx % print_interval == 0:
