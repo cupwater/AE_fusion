@@ -36,8 +36,8 @@ class VisibleInfraredTestDataset(Dataset):
             vis_img = image_read_cv2(os.path.join(prefix, "vi", img_name), mode='GRAY')
             ir_img = image_read_cv2(os.path.join(prefix, "ir", img_name),mode='GRAY')
 
-            vis_img = cv2.resize(vis_img, (240, 320))
-            ir_img = cv2.resize(ir_img, (240, 320))
+            vis_img = cv2.resize(vis_img, (120, 160))
+            ir_img = cv2.resize(ir_img, (120, 160))
 
             vis_process = vis_img[np.newaxis, ...]/255.0
             ir_process = ir_img[np.newaxis, ...]/255.0

@@ -86,29 +86,31 @@ def main(config_file, is_eval):
     #     momentum=0.9,
     #     weight_decay=common_config['weight_decay'])
 
-    # logger
-    logger = Logger(os.path.join(common_config['save_path'], 'log.txt'))
-    logger.set_names(['Learning Rate', 'bg_diff', 'detail_diff',
-                     'vis_rec', 'ir_rec', 'vis_gradient', 'loss'])
-
     if is_eval:
         model.load_state_dict(torch.load(os.path.join(
             common_config['save_path'], 'checkpoint.pth.tar'))['state_dict'], strict=True)
-        test(testloader, model, common_config['save_path'], use_cuda)
+        print(test(testloader, model, common_config['save_path'], use_cuda))
         return
+
+    # logger
+    logger = Logger(os.path.join(common_config['save_path'], 'log.txt'))
+    logger.set_names(['Learning Rate', 'decomp', 'fusion',
+                     'vis_rec', 'ir_rec', 'vis_gradient', 'loss',
+                    'EN','SD','SF','MI','SCD','VIFF','Qabf','SSIM'])
 
     # Train and val
     for epoch in range(common_config['epoch']):
         adjust_learning_rate(optimizer, epoch, common_config)
-        test(testloader, model, common_config['save_path'], use_cuda)
         print('\nEpoch: [%d | %d] LR: %f' %
               (epoch + 1, common_config['epoch'], state['lr']))
-        bg_diff, detail_diff, vis_rec, ir_rec, vis_gradient, loss = \
+        decomp, fusion, vis_rec, ir_rec, vis_gradient, loss = \
                             train(trainloader, model, criterion_list, optimizer, \
                                   use_cuda, epoch, common_config['print_interval'])
+
+        result_metric = test(testloader, model, common_config['save_path'], use_cuda)
         # append logger file
-        logger.append([state['lr'], bg_diff, detail_diff,
-                      vis_rec, ir_rec, vis_gradient, loss])
+        logger.append([state['lr'], decomp, fusion,
+                      vis_rec, ir_rec, vis_gradient, loss] + result_metric.tolist())
         best_loss = min(loss, best_loss)
         save_checkpoint({
             'epoch': epoch + 1,
@@ -131,6 +133,8 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda, epoch, print_
     vis_rec = AverageMeter()
     ir_rec = AverageMeter()
     vis_gradient = AverageMeter()
+    decomp = AverageMeter()
+    fusion = AverageMeter()
 
     end = time.time()
 
@@ -165,10 +169,10 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda, epoch, print_
                 vis_gradient.update(temp_loss)
             elif loss_key == 'decomp':
                 temp_loss = weight * loss_fun(vis_feat_bg, vis_feat_detail, ir_feat_bg, ir_feat_detail)
-                vis_gradient.update(temp_loss)
+                decomp.update(temp_loss)
             elif loss_key == 'fusion':
                 temp_loss = weight * loss_fun(out_vis, out_ir, out_fuse)
-                vis_gradient.update(temp_loss)
+                fusion.update(temp_loss)
             else:
                 print("error, no such loss")
             all_loss += temp_loss
@@ -180,16 +184,16 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda, epoch, print_
         optimizer.step()
 
         if batch_idx % print_interval == 0:
-            print("iter/epoch: %d / %d \t bg_dif: %.3f \t detail_dif: %.3f, \
+            print("iter/epoch: %d / %d \t decomp: %.3f \t fusion: %.3f, \
                     vis_rec: %.3f \t ir_rec: %.3f \t vis_gradient: %.3f \t losses: %.3f" % (
-                batch_idx, epoch, bg_diff.avg, detail_diff.avg,
+                batch_idx, epoch, decomp.avg, fusion.avg,
                 vis_rec.avg, ir_rec.avg, vis_gradient.avg, losses.avg))
 
         # progress_bar(batch_idx, len(trainloader), 'Loss: %.2f ' % (losses.avg))
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
-    return (bg_diff.avg, detail_diff.avg, vis_rec.avg,
+    return (decomp.avg, fusion.avg, vis_rec.avg,
             ir_rec.avg, vis_gradient.avg, losses.avg)
 
 
@@ -209,17 +213,22 @@ def test(testloader, model, save_path, use_cuda):
         data_time.update(time.time() - end)
         if use_cuda:
             vis_input, ir_input = vis_input.cuda(), ir_input.cuda()
-        
-        fuse_out = model(vis_input, ir_input).cpu().detach().numpy()
-
+        fuse_out = model(vis_input, ir_input).cpu().detach().numpy()*255.0
+        fuse_out = np.round(fuse_out)
+        vis_imgs = np.round(vis_imgs.numpy())
+        ir_imgs = np.round(ir_imgs.numpy())
         for idx in range(fuse_out.shape[0]):
-            fuse_img = np.transpose(fuse_out[idx], (1, 2, 0))
+            fuse_img = fuse_out[idx, 0]
             #imsave(f"{save_path}/{batch_idx}_{idx}.jpg", fuse_img)
-
-            metric_result += np.array([Evaluator.EN(fuse_img), Evaluator.SD(fuse_img),
-                            Evaluator.SF(fuse_img), Evaluator.MI(fuse_img, ir_imgs[idx], vis_imgs[idx]),
-                            Evaluator.SCD(fuse_img, ir_imgs[idx], vis_imgs[idx]), Evaluator.VIFF(fuse_img, ir_imgs[idx], vis_imgs[idx]),
-                            Evaluator.Qabf(fuse_img, ir_imgs[idx], vis_imgs[idx]), Evaluator.SSIM(fuse_img, ir_imgs[idx], vis_imgs[idx])])
+            metric_result += np.round(np.array([
+                            Evaluator.EN(fuse_img), 
+                            Evaluator.SD(fuse_img), 
+                            Evaluator.SF(fuse_img), 
+                            Evaluator.MI(fuse_img, ir_imgs[idx], vis_imgs[idx]),
+                            Evaluator.SCD(fuse_img, ir_imgs[idx], vis_imgs[idx]), 
+                            Evaluator.VIFF(fuse_img, ir_imgs[idx], vis_imgs[idx]),
+                            Evaluator.Qabf(fuse_img, ir_imgs[idx], vis_imgs[idx]), 
+                            Evaluator.SSIM(fuse_img, ir_imgs[idx], vis_imgs[idx])]), 3)
 
         progress_bar(batch_idx, len(testloader))
         # measure elapsed time
@@ -227,18 +236,19 @@ def test(testloader, model, save_path, use_cuda):
         end = time.time()
 
     metric_result /= len(testloader)
-    print("EN\t SD\t SF\t MI\tSCD\tVIF\tQabf\tSSIM")
-    print(str(np.round(metric_result[0], 2))+'\t'
-            +str(np.round(metric_result[1], 2))+'\t'
-            +str(np.round(metric_result[2], 2))+'\t'
-            +str(np.round(metric_result[3], 2))+'\t'
-            +str(np.round(metric_result[4], 2))+'\t'
-            +str(np.round(metric_result[5], 2))+'\t'
-            +str(np.round(metric_result[6], 2))+'\t'
-            +str(np.round(metric_result[7], 2))
-            )
-    print("="*80)
-    return (losses.avg)
+    #print("EN\t SD\t SF\t MI\tSCD\tVIF\tQabf\tSSIM")
+    #print(str(np.round(metric_result[0], 2))+'\t'
+    #        +str(np.round(metric_result[1], 2))+'\t'
+    #        +str(np.round(metric_result[2], 2))+'\t'
+    #        +str(np.round(metric_result[3], 2))+'\t'
+    #        +str(np.round(metric_result[4], 2))+'\t'
+    #        +str(np.round(metric_result[5], 2))+'\t'
+    #        +str(np.round(metric_result[6], 2))+'\t'
+    #        +str(np.round(metric_result[7], 2))
+    #        )
+    #print("="*80)
+    #return (losses.avg)
+    return np.round(metric_result, 3)
 
 def save_checkpoint(state, is_best, save_path, filename='checkpoint.pth.tar'):
     filepath = os.path.join(save_path, filename)
