@@ -13,6 +13,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 import sys
 import time
 import datetime
+from logger import Logger
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -28,7 +29,7 @@ Configure our network
 '''
 
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
 criteria_fusion = Fusionloss()
 model_str = 'CDDFuse'
 
@@ -75,7 +76,7 @@ scheduler4 = torch.optim.lr_scheduler.StepLR(optimizer4, step_size=optim_step, g
 
 MSELoss = nn.MSELoss()  
 L1Loss = nn.L1Loss()
-Loss_ssim = kornia.losses.SSIM(11, reduction='mean')
+Loss_ssim = kornia.losses.SSIMLoss(window_size=11, reduction='mean')
 
 
 # data loader
@@ -97,7 +98,41 @@ step = 0
 torch.backends.cudnn.benchmark = True
 prev_time = time.time()
 
+
+class AverageMeter(object):
+    """Computes and stores the average and current value
+       Imported from https://github.com/pytorch/examples/blob/master/imagenet/main.py#L247-L262
+    """
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+
+
+# logger
+logger = Logger(os.path.join('models', 'log.txt'))
+logger.set_names(['decomp', 'fusion', 'vis_rec', 'ir_rec', 'vis_gradient', 'loss'])
+
+
 for epoch in range(num_epochs):
+
+    losses = AverageMeter()
+    vis_rec = AverageMeter()
+    ir_rec = AverageMeter()
+    vis_gradient = AverageMeter()
+    decomp = AverageMeter()
+    fusion = AverageMeter()
+
     ''' train '''
     for i, (data_VIS, data_IR) in enumerate(loader['train']):
         data_VIS, data_IR = data_VIS.cuda(), data_IR.cuda()
@@ -130,6 +165,8 @@ for epoch in range(num_epochs):
             Gradient_loss = L1Loss(kornia.filters.SpatialGradient()(data_VIS),
                                    kornia.filters.SpatialGradient()(data_VIS_hat))
 
+            fusionloss = 0
+
             loss_decomp =  (cc_loss_D) ** 2/ (1.01 + cc_loss_B)  
 
             loss = coeff_mse_loss_VF * mse_loss_V + coeff_mse_loss_IF * \
@@ -157,6 +194,8 @@ for epoch in range(num_epochs):
             cc_loss_D = cc(feature_V_D, feature_I_D)
             loss_decomp =   (cc_loss_D) ** 2 / (1.01 + cc_loss_B)  
             fusionloss, _,_  = criteria_fusion(data_VIS, data_IR, data_Fuse)
+
+            Gradient_loss = 0
             
             loss = fusionloss + coeff_decomp * loss_decomp
             loss.backward()
@@ -172,12 +211,20 @@ for epoch in range(num_epochs):
             optimizer2.step()
             optimizer3.step()
             optimizer4.step()
+        
+        vis_rec.update(mse_loss_V)
+        ir_rec.update(mse_loss_I)
+        vis_gradient.update(Gradient_loss)
+        decomp.update(loss_decomp)
+        fusion.update(fusionloss)
+        losses.update(loss.item(), data_VIS.size(0))
 
         # Determine approximate time left
         batches_done = epoch * len(loader['train']) + i
         batches_left = num_epochs * len(loader['train']) - batches_done
         time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
         prev_time = time.time()
+
         sys.stdout.write(
             "\r[Epoch %d/%d] [Batch %d/%d] [loss: %f] ETA: %.10s"
             % (
@@ -191,7 +238,6 @@ for epoch in range(num_epochs):
         )
 
     # adjust the learning rate
-
     scheduler1.step()  
     scheduler2.step()
     if not epoch < epoch_gap:
@@ -207,6 +253,11 @@ for epoch in range(num_epochs):
     if optimizer4.param_groups[0]['lr'] <= 1e-6:
         optimizer4.param_groups[0]['lr'] = 1e-6
     
+    logger.append([decomp.avg, fusion.avg, vis_rec.avg,
+            ir_rec.avg, vis_gradient.avg, losses.avg])
+
+logger.close()
+
 if True:
     checkpoint = {
         'DIDF_Encoder': DIDF_Encoder.state_dict(),

@@ -213,7 +213,8 @@ def test(testloader, model, save_path, use_cuda):
         data_time.update(time.time() - end)
         if use_cuda:
             vis_input, ir_input = vis_input.cuda(), ir_input.cuda()
-        fuse_out = model(vis_input, ir_input).cpu().detach().numpy()*255.0
+        fuse_out = model(vis_input, ir_input).cpu().detach().numpy()
+        fuse_out = 255.0*(fuse_out - np.min(fuse_out)) / (np.max(fuse_out) - np.min(fuse_out))
         fuse_out = np.round(fuse_out)
         vis_imgs = np.round(vis_imgs.numpy())
         ir_imgs = np.round(ir_imgs.numpy())
