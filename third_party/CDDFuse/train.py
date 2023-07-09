@@ -21,13 +21,11 @@ from loss import Fusionloss, cc
 import kornia
 
 
-
 '''
 ------------------------------------------------------------------------------
 Configure our network
 ------------------------------------------------------------------------------
 '''
-
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
 criteria_fusion = Fusionloss()
@@ -39,7 +37,7 @@ epoch_gap = 40  # epoches of Phase I
 
 lr = 1e-4
 weight_decay = 0
-batch_size = 8
+batch_size = 32
 GPU_number = os.environ['CUDA_VISIBLE_DEVICES']
 # Coefficients of the loss function
 coeff_mse_loss_VF = 1. # alpha1
@@ -54,10 +52,10 @@ optim_gamma = 0.5
 
 # Model
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-DIDF_Encoder = nn.DataParallel(Restormer_Encoder()).to(device)
-DIDF_Decoder = nn.DataParallel(Restormer_Decoder()).to(device)
-BaseFuseLayer = nn.DataParallel(BaseFeatureExtraction(dim=64, num_heads=8)).to(device)
-DetailFuseLayer = nn.DataParallel(DetailFeatureExtraction(num_layers=1)).to(device)
+DIDF_Encoder = nn.DataParallel(Restormer_Encoder(dim=16)).to(device)
+DIDF_Decoder = nn.DataParallel(Restormer_Decoder(dim=16)).to(device)
+BaseFuseLayer = nn.DataParallel(BaseFeatureExtraction(dim=16, num_heads=8)).to(device)
+DetailFuseLayer = nn.DataParallel(DetailFeatureExtraction(num_layers=1, dim=16)).to(device)
 
 # optimizer, scheduler and loss function
 optimizer1 = torch.optim.Adam(
@@ -83,7 +81,7 @@ Loss_ssim = kornia.losses.SSIMLoss(window_size=11, reduction='mean')
 trainloader = DataLoader(H5Dataset(r"data/MSRS_train_imgsize_128_stride_200.h5"),
                          batch_size=batch_size,
                          shuffle=True,
-                         num_workers=0)
+                         num_workers=16)
 
 loader = {'train': trainloader, }
 timestamp = datetime.datetime.now().strftime("%m-%d-%H-%M")
@@ -120,7 +118,7 @@ class AverageMeter(object):
 
 
 # logger
-logger = Logger(os.path.join('models', 'log.txt'))
+logger = Logger(os.path.join('models_16channels', 'log.txt'))
 logger.set_names(['decomp', 'fusion', 'vis_rec', 'ir_rec', 'vis_gradient', 'loss'])
 
 
@@ -265,6 +263,6 @@ if True:
         'BaseFuseLayer': BaseFuseLayer.state_dict(),
         'DetailFuseLayer': DetailFuseLayer.state_dict(),
     }
-    torch.save(checkpoint, os.path.join("models/CDDFuse_"+timestamp+'.pth'))
+    torch.save(checkpoint, os.path.join("models_16channel/CDDFuse_"+timestamp+'.pth'))
 
 
