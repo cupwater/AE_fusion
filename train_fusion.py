@@ -71,13 +71,12 @@ def main(config_file, is_eval):
 
     # get all the loss functions into criterion_list
     # optimizer and scheduler
-    criterion_list = []
+    criterion_dict = {}
     for loss_key, loss_dict in config['loss_config'].items():
         criterion = losses.__dict__[loss_dict['type']]()
         if use_cuda:
             criterion = criterion.cuda()
-        weight = loss_dict['weight']
-        criterion_list.append([criterion, weight, loss_key])
+        criterion_dict[loss_key] =  [criterion, loss_dict['weight']]
     optimizer = torch.optim.Adam(model.parameters(), lr=common_config['lr'], \
                                   weight_decay=common_config['weight_decay'])
     # optimizer = torch.optim.SGD(
@@ -103,10 +102,15 @@ def main(config_file, is_eval):
     # Train and val
     for epoch in range(common_config['epoch']):
         adjust_learning_rate(optimizer, epoch, common_config)
+
+        # start to Stage-II training
+        if epoch == 40 and 'fusion' in criterion_dict.keys():
+            criterion_dict['fusion'][1] = 1
+
         print('\nEpoch: [%d | %d] LR: %f' %
               (epoch + 1, common_config['epoch'], state['lr']))
         decomp, fusion, vis_rec, ir_rec, vis_gradient, loss = \
-                            train(trainloader, model, criterion_list, optimizer, \
+                            train(trainloader, model, criterion_dict, optimizer, \
                                   use_cuda, epoch, common_config['print_interval'])
 
         result_metric = np.zeros((8))
@@ -124,7 +128,7 @@ def main(config_file, is_eval):
     logger.close()
 
 
-def train(trainloader, model, criterion_list, optimizer, use_cuda, epoch, print_interval=100):
+def train(trainloader, model, criterion_dict, optimizer, use_cuda, epoch, print_interval=100):
     # switch to train mode
     model.train()
 
@@ -153,7 +157,7 @@ def train(trainloader, model, criterion_list, optimizer, use_cuda, epoch, print_
             ir_feat_bg, ir_feat_detail, out_fuse = model(vis_input, ir_input)
 
         all_loss = 0
-        for loss_fun, weight, loss_key in criterion_list:
+        for loss_key, (loss_fun, weight) in criterion_dict.items():
             if loss_key == 'bg_dif':
                 temp_loss = weight * \
                     torch.tanh(loss_fun(ir_feat_bg, vis_feat_bg))
