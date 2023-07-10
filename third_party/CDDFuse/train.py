@@ -37,7 +37,7 @@ epoch_gap = 40  # epoches of Phase I
 
 lr = 1e-4
 weight_decay = 0
-batch_size = 16
+batch_size = 8
 GPU_number = os.environ['CUDA_VISIBLE_DEVICES']
 # Coefficients of the loss function
 coeff_mse_loss_VF = 1. # alpha1
@@ -51,7 +51,7 @@ optim_gamma = 0.5
 
 
 
-model_dim = 16
+model_dim = 64
 # Model
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 DIDF_Encoder = nn.DataParallel(Restormer_Encoder(dim=model_dim)).to(device)
