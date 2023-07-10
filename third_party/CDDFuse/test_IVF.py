@@ -1,7 +1,7 @@
 from net import Restormer_Encoder, Restormer_Decoder, BaseFeatureExtraction, DetailFeatureExtraction
 import os
 import numpy as np
-from third_party.CDDFuse.Evaluator import Evaluator
+from Evaluator import Evaluator
 import torch
 import torch.nn as nn
 from img_read_save import img_save,image_read_cv2
@@ -11,8 +11,11 @@ warnings.filterwarnings("ignore")
 logging.basicConfig(level=logging.CRITICAL)
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-ckpt_path=r"models/CDDFuse_IVF.pth"
-for dataset_name in ["TNO","RoadScene"]:
+#ckpt_path=r"models/CDDFuse_IVF.pth"
+ckpt_path=r"models_channel64/CDDFuse_07-10-23-05.pth"
+model_dim=64
+#for dataset_name in ["TNO","RoadScene"]:
+for dataset_name in ["MSRS_test"]:
     print("\n"*2+"="*80)
     model_name="CDDFuse    "
     print("The test result of "+dataset_name+' :')
@@ -20,10 +23,10 @@ for dataset_name in ["TNO","RoadScene"]:
     test_out_folder=os.path.join('test_result',dataset_name)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    Encoder = nn.DataParallel(Restormer_Encoder()).to(device)
-    Decoder = nn.DataParallel(Restormer_Decoder()).to(device)
-    BaseFuseLayer = nn.DataParallel(BaseFeatureExtraction(dim=64, num_heads=8)).to(device)
-    DetailFuseLayer = nn.DataParallel(DetailFeatureExtraction(num_layers=1)).to(device)
+    Encoder = nn.DataParallel(Restormer_Encoder(dim=model_dim)).to(device)
+    Decoder = nn.DataParallel(Restormer_Decoder(dim=model_dim)).to(device)
+    BaseFuseLayer = nn.DataParallel(BaseFeatureExtraction(dim=model_dim, num_heads=8)).to(device)
+    DetailFuseLayer = nn.DataParallel(DetailFeatureExtraction(dim=model_dim,num_layers=1)).to(device)
 
     Encoder.load_state_dict(torch.load(ckpt_path)['DIDF_Encoder'])
     Decoder.load_state_dict(torch.load(ckpt_path)['DIDF_Decoder'])

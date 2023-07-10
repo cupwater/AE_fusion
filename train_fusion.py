@@ -58,7 +58,7 @@ def main(config_file, is_eval):
     trainloader = torch.utils.data.DataLoader(
         trainset, batch_size=common_config['train_batch'], shuffle=True, num_workers=16)
     testloader = torch.utils.data.DataLoader(
-        testset, batch_size=common_config['test_batch'], shuffle=False, num_workers=16)
+        testset, batch_size=common_config['test_batch'], shuffle=False, num_workers=4)
 
     # Model
     print("==> creating model '{}'".format(common_config['arch']))
@@ -224,13 +224,14 @@ def test(testloader, model, save_path, use_cuda):
         if use_cuda:
             vis_input, ir_input = vis_input.cuda(), ir_input.cuda()
         fuse_out = model(vis_input, ir_input).cpu().detach().numpy()
-        fuse_out = 255.0*(fuse_out - np.min(fuse_out)) / (np.max(fuse_out) - np.min(fuse_out))
-        fuse_out = np.round(fuse_out)
         vis_imgs = np.round(vis_imgs.numpy())
         ir_imgs = np.round(ir_imgs.numpy())
         for idx in range(fuse_out.shape[0]):
             fuse_img = fuse_out[idx, 0]
-            #imsave(f"{save_path}/{batch_idx}_{idx}.jpg", fuse_img)
+            fuse_img = 255.0*(fuse_img - np.min(fuse_img)) / (np.max(fuse_img) - np.min(fuse_img))
+            fuse_img = np.round(fuse_img)
+            pdb.set_trace()
+            imsave(f"{save_path}/{batch_idx}_{idx}.jpg", fuse_img)
             metric_result += np.round(np.array([
                             Evaluator.EN(fuse_img), 
                             Evaluator.SD(fuse_img), 

@@ -1,4 +1,7 @@
 __pycache__
+*.png
+*.pth
+third_party/
 *.jpg
 *.txt
 dehaze_data/

@@ -19,6 +19,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from loss import Fusionloss, cc
 import kornia
+import pdb
 
 
 '''
@@ -32,12 +33,12 @@ criteria_fusion = Fusionloss()
 model_str = 'CDDFuse'
 
 # . Set the hyper-parameters for training
-num_epochs = 120 # total epoch
-epoch_gap = 40  # epoches of Phase I 
+num_epochs = 50 # total epoch
+epoch_gap = 16  # epoches of Phase I 
 
 lr = 1e-4
 weight_decay = 0
-batch_size = 8
+batch_size = 16
 GPU_number = os.environ['CUDA_VISIBLE_DEVICES']
 # Coefficients of the loss function
 coeff_mse_loss_VF = 1. # alpha1
@@ -46,12 +47,12 @@ coeff_decomp = 2.      # alpha2 and alpha4
 coeff_tv = 5.
 
 clip_grad_norm_value = 0.01
-optim_step = 20
+optim_step = 8
 optim_gamma = 0.5
 
 
 
-model_dim = 64
+model_dim = 16
 # Model
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 DIDF_Encoder = nn.DataParallel(Restormer_Encoder(dim=model_dim)).to(device)
@@ -123,6 +124,10 @@ class AverageMeter(object):
 logger = Logger(os.path.join(f"models_channel{model_dim}", 'log.txt'))
 logger.set_names(['decomp', 'fusion', 'vis_rec', 'ir_rec', 'vis_gradient', 'loss'])
 
+DIDF_Encoder.train()
+DIDF_Decoder.train()
+BaseFuseLayer.train()
+DetailFuseLayer.train()
 
 for epoch in range(num_epochs):
 
@@ -136,10 +141,6 @@ for epoch in range(num_epochs):
     ''' train '''
     for i, (data_VIS, data_IR) in enumerate(loader['train']):
         data_VIS, data_IR = data_VIS.cuda(), data_IR.cuda()
-        DIDF_Encoder.train()
-        DIDF_Decoder.train()
-        BaseFuseLayer.train()
-        DetailFuseLayer.train()
 
         DIDF_Encoder.zero_grad()
         DIDF_Decoder.zero_grad()
@@ -151,54 +152,44 @@ for epoch in range(num_epochs):
         optimizer3.zero_grad()
         optimizer4.zero_grad()
 
+        feature_V_B, feature_V_D, _ = DIDF_Encoder(data_VIS)
+        feature_I_B, feature_I_D, _ = DIDF_Encoder(data_IR)
+        data_VIS_hat, _ = DIDF_Decoder(data_VIS, feature_V_B, feature_V_D)
+        data_IR_hat, _ = DIDF_Decoder(data_IR, feature_I_B, feature_I_D)
+
+        cc_loss_B = cc(feature_V_B, feature_I_B)
+        cc_loss_D = cc(feature_V_D, feature_I_D)
+        mse_loss_V = 5 * Loss_ssim(data_VIS, data_VIS_hat) + MSELoss(data_VIS, data_VIS_hat)
+        mse_loss_I = 5 * Loss_ssim(data_IR, data_IR_hat) + MSELoss(data_IR, data_IR_hat)
+
+        Gradient_loss = L1Loss(kornia.filters.SpatialGradient()(data_VIS),
+                               kornia.filters.SpatialGradient()(data_VIS_hat))
+        loss_decomp =  (cc_loss_D) ** 2/ (1.01 + cc_loss_B)  
+
         if epoch < epoch_gap: #Phase I
-            feature_V_B, feature_V_D, _ = DIDF_Encoder(data_VIS)
-            feature_I_B, feature_I_D, _ = DIDF_Encoder(data_IR)
-            data_VIS_hat, _ = DIDF_Decoder(data_VIS, feature_V_B, feature_V_D)
-            data_IR_hat, _ = DIDF_Decoder(data_IR, feature_I_B, feature_I_D)
-
-            cc_loss_B = cc(feature_V_B, feature_I_B)
-            cc_loss_D = cc(feature_V_D, feature_I_D)
-            mse_loss_V = 5 * Loss_ssim(data_VIS, data_VIS_hat) + MSELoss(data_VIS, data_VIS_hat)
-            mse_loss_I = 5 * Loss_ssim(data_IR, data_IR_hat) + MSELoss(data_IR, data_IR_hat)
-
-            Gradient_loss = L1Loss(kornia.filters.SpatialGradient()(data_VIS),
-                                   kornia.filters.SpatialGradient()(data_VIS_hat))
-
             fusionloss = 0
-
-            loss_decomp =  (cc_loss_D) ** 2/ (1.01 + cc_loss_B)  
-
             loss = coeff_mse_loss_VF * mse_loss_V + coeff_mse_loss_IF * \
                    mse_loss_I + coeff_decomp * loss_decomp + coeff_tv * Gradient_loss
-
             loss.backward()
             nn.utils.clip_grad_norm_(
                 DIDF_Encoder.parameters(), max_norm=clip_grad_norm_value, norm_type=2)
             nn.utils.clip_grad_norm_(
                 DIDF_Decoder.parameters(), max_norm=clip_grad_norm_value, norm_type=2)
+
+            fusion.update(0)
             optimizer1.step()  
             optimizer2.step()
         else:  #Phase II
-            feature_V_B, feature_V_D, feature_V = DIDF_Encoder(data_VIS)
-            feature_I_B, feature_I_D, feature_I = DIDF_Encoder(data_IR)
             feature_F_B = BaseFuseLayer(feature_I_B+feature_V_B)
             feature_F_D = DetailFuseLayer(feature_I_D+feature_V_D)
-            data_Fuse, feature_F = DIDF_Decoder(data_VIS, feature_F_B, feature_F_D)  
-
             
-            mse_loss_V = 5*Loss_ssim(data_VIS, data_Fuse) + MSELoss(data_VIS, data_Fuse)
-            mse_loss_I = 5*Loss_ssim(data_IR,  data_Fuse) + MSELoss(data_IR,  data_Fuse)
-
-            cc_loss_B = cc(feature_V_B, feature_I_B)
-            cc_loss_D = cc(feature_V_D, feature_I_D)
-            loss_decomp =   (cc_loss_D) ** 2 / (1.01 + cc_loss_B)  
+            data_Fuse, feature_F = DIDF_Decoder(data_VIS, feature_F_B, feature_F_D)  
             fusionloss, _,_  = criteria_fusion(data_VIS, data_IR, data_Fuse)
-
-            Gradient_loss = 0
             
             loss = fusionloss + coeff_decomp * loss_decomp
             loss.backward()
+
+            fusion.update(fusionloss.item())
             nn.utils.clip_grad_norm_(
                 DIDF_Encoder.parameters(), max_norm=clip_grad_norm_value, norm_type=2)
             nn.utils.clip_grad_norm_(
@@ -207,16 +198,16 @@ for epoch in range(num_epochs):
                 BaseFuseLayer.parameters(), max_norm=clip_grad_norm_value, norm_type=2)
             nn.utils.clip_grad_norm_(
                 DetailFuseLayer.parameters(), max_norm=clip_grad_norm_value, norm_type=2)
+
             optimizer1.step()  
             optimizer2.step()
             optimizer3.step()
             optimizer4.step()
-        
-        vis_rec.update(mse_loss_V)
-        ir_rec.update(mse_loss_I)
-        vis_gradient.update(Gradient_loss)
-        decomp.update(loss_decomp)
-        fusion.update(fusionloss)
+
+        vis_rec.update(mse_loss_V.item())
+        ir_rec.update(mse_loss_I.item())
+        vis_gradient.update(Gradient_loss.item())
+        decomp.update(loss_decomp.item())
         losses.update(loss.item(), data_VIS.size(0))
 
         # Determine approximate time left
