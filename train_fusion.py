@@ -56,15 +56,17 @@ def main(config_file, is_eval):
 
     # create dataloader for training and testing
     trainloader = torch.utils.data.DataLoader(
-        trainset, batch_size=common_config['train_batch'], shuffle=True, num_workers=5)
+        trainset, batch_size=common_config['train_batch'], shuffle=True, num_workers=16)
     testloader = torch.utils.data.DataLoader(
-        testset, batch_size=common_config['test_batch'], shuffle=False, num_workers=5)
+        testset, batch_size=common_config['test_batch'], shuffle=False, num_workers=16)
 
     # Model
     print("==> creating model '{}'".format(common_config['arch']))
-    model = models.__dict__[common_config['arch']](dim=16)
+    model = models.__dict__[common_config['arch']]()
     if use_cuda:
         model = model.cuda()
+    model = torch.nn.DataParallel(model)
+
     torch.backends.cudnn.benchmark = True
 
     # get all the loss functions into criterion_list
@@ -107,7 +109,7 @@ def main(config_file, is_eval):
                             train(trainloader, model, criterion_list, optimizer, \
                                   use_cuda, epoch, common_config['print_interval'])
 
-        result_metric = test(testloader, model, common_config['save_path'], use_cuda)
+        result_metric = np.zeros((8))
         # append logger file
         logger.append([state['lr'], decomp, fusion,
                       vis_rec, ir_rec, vis_gradient, loss] + result_metric.tolist())
@@ -117,6 +119,8 @@ def main(config_file, is_eval):
             'state_dict': model.state_dict(),
         }, loss < best_loss, save_path=common_config['save_path'])
 
+    result_metric = test(testloader, model, common_config['save_path'], use_cuda)
+    print(result_metric)
     logger.close()
 
 
@@ -232,7 +236,7 @@ def test(testloader, model, save_path, use_cuda):
                             Evaluator.Qabf(fuse_img, ir_imgs[idx], vis_imgs[idx]), 
                             Evaluator.SSIM(fuse_img, ir_imgs[idx], vis_imgs[idx])]), 3)
 
-        progress_bar(batch_idx, len(testloader))
+        #progress_bar(batch_idx, len(testloader))
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
