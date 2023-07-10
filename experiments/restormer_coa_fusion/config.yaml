@@ -1,5 +1,5 @@
 common:
-    arch: RestormerAutoEncoder
+    arch: CDDFuseLarge
     workers: 4
     train_batch: 8
     test_batch: 1

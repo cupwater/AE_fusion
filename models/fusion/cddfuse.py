@@ -8,6 +8,8 @@ from einops import rearrange
 import pdb
 
 
+__all__ = ['CDDFuseLight', 'CDDFuseLarge']
+
 def drop_path(x, drop_prob: float = 0., training: bool = False):
     """
     Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks).
@@ -568,11 +570,19 @@ class CDDFuse(nn.Module):
             return fuse_img
 
 
+
+def CDDFuseLight():
+    return CDDFuse(dim=16)
+
+def CDDFuseLarge():
+    return CDDFuse(dim=64)
+
+
 if __name__ == '__main__':
     h, w = 128, 128
     vis_img, ir_img = torch.randn(1, 1, h, w), torch.randn(1, 1, h, w)
 
-    restormer_ae_model = RestormerAutoEncoder(dim=16)
+    restormer_ae_model = CDDFuseLight()
 
     if torch.cuda.is_available():
         vis_img, ir_img = vis_img.cuda(), ir_img.cuda()

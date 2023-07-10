@@ -8,6 +8,9 @@ from einops import rearrange
 import pdb
 
 
+__all__ = ['COALight', 'COALarge']
+
+
 def drop_path(x, drop_prob: float = 0., training: bool = False):
     """
     Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks).
@@ -565,6 +568,14 @@ class RestormerAutoEncoder(nn.Module):
                     fuse_img
         else:
             return fuse_img
+
+
+def COALight():
+    return RestormerAutoEncoder(dim=16)
+
+
+def COALarge():
+    return RestormerAutoEncoder(dim=64)
 
 
 if __name__ == '__main__':
