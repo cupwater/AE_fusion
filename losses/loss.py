@@ -2,7 +2,7 @@
 '''
 Author: Pengbo
 Date: 2022-02-23 16:17:31
-LastEditTime: 2023-03-01 21:21:33
+LastEditTime: 2023-07-10 16:13:23
 Description: loss function
 
 '''
@@ -137,7 +137,7 @@ class MS_SSIMLoss(nn.Module):
         self.mse = nn.MSELoss()
 
     def forward(self, img1, img2):
-        return self.ssim(img1, img2) + self.mse(img1, img2)
+        return 5*self.ssim(img1, img2) + self.mse(img1, img2)
 
 
 class GradientL1Loss(nn.Module):

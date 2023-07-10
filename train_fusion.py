@@ -106,6 +106,9 @@ def main(config_file, is_eval):
         # start to Stage-II training
         if epoch == 40 and 'fusion' in criterion_dict.keys():
             criterion_dict['fusion'][1] = 1
+            criterion_dict['vis_rec'][1] = 0
+            criterion_dict['ir_rec'][1] = 0
+            criterion_dict['vis_gradient'][1] = 0
 
         print('\nEpoch: [%d | %d] LR: %f' %
               (epoch + 1, common_config['epoch'], state['lr']))
@@ -159,31 +162,29 @@ def train(trainloader, model, criterion_dict, optimizer, use_cuda, epoch, print_
         all_loss = 0
         for loss_key, (loss_fun, weight) in criterion_dict.items():
             if loss_key == 'bg_dif':
-                temp_loss = weight * \
-                    torch.tanh(loss_fun(ir_feat_bg, vis_feat_bg))
+                temp_loss = torch.tanh(loss_fun(ir_feat_bg, vis_feat_bg))
                 bg_diff.update(temp_loss.item(), vis_input.size(0))
             elif loss_key == 'detail_dif':
-                temp_loss = weight * \
-                    torch.tanh(loss_fun(ir_feat_detail, vis_feat_detail))
+                temp_loss = torch.tanh(loss_fun(ir_feat_detail, vis_feat_detail))
                 detail_diff.update(temp_loss)
             elif loss_key == 'vis_rec':
-                temp_loss = weight * loss_fun(out_vis, vis_input)
+                temp_loss = loss_fun(out_vis, vis_input)
                 vis_rec.update(temp_loss)
             elif loss_key == 'ir_rec':
-                temp_loss = weight * loss_fun(out_ir, ir_input)
+                temp_loss = loss_fun(out_ir, ir_input)
                 ir_rec.update(temp_loss)
             elif loss_key == 'vis_gradient':
-                temp_loss = weight * loss_fun(vis_input, out_vis)
+                temp_loss = loss_fun(vis_input, out_vis)
                 vis_gradient.update(temp_loss)
             elif loss_key == 'decomp':
-                temp_loss = weight * loss_fun(vis_feat_bg, vis_feat_detail, ir_feat_bg, ir_feat_detail)
+                temp_loss = loss_fun(vis_feat_bg, vis_feat_detail, ir_feat_bg, ir_feat_detail)
                 decomp.update(temp_loss)
             elif loss_key == 'fusion':
-                temp_loss = weight * loss_fun(out_vis, out_ir, out_fuse)
+                temp_loss = loss_fun(out_vis, out_ir, out_fuse)
                 fusion.update(temp_loss)
             else:
                 print("error, no such loss")
-            all_loss += temp_loss
+            all_loss += weight*temp_loss
 
         losses.update(all_loss.item(), vis_input.size(0))
         # compute gradient and do SGD step
