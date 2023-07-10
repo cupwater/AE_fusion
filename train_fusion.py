@@ -79,6 +79,9 @@ def main(config_file, is_eval):
         criterion_dict[loss_key] =  [criterion, loss_dict['weight']]
     optimizer = torch.optim.Adam(model.parameters(), lr=common_config['lr'], \
                                   weight_decay=common_config['weight_decay'])
+
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, \
+                     step_size=common_config['step_size'], gamma=common_config['gamma'])
     # optimizer = torch.optim.SGD(
     #     filter(
     #         lambda p: p.requires_grad,
@@ -101,10 +104,10 @@ def main(config_file, is_eval):
 
     # Train and val
     for epoch in range(common_config['epoch']):
-        adjust_learning_rate(optimizer, epoch, common_config)
+        #adjust_learning_rate(optimizer, epoch, common_config)
 
         # start to Stage-II training
-        if epoch == 40 and 'fusion' in criterion_dict.keys():
+        if epoch == 42 and 'fusion' in criterion_dict.keys():
             criterion_dict['fusion'][1] = 1
             criterion_dict['vis_rec'][1] = 0
             criterion_dict['ir_rec'][1] = 0
@@ -125,6 +128,8 @@ def main(config_file, is_eval):
             'epoch': epoch + 1,
             'state_dict': model.state_dict(),
         }, loss < best_loss, save_path=common_config['save_path'])
+
+        scheduler.step()
 
     result_metric = test(testloader, model, common_config['save_path'], use_cuda)
     print(result_metric)
