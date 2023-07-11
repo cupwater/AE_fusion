@@ -4,9 +4,10 @@ common:
     train_batch: 64
     test_batch: 8
     shuffle_strategy: 1
-    lr: 0.001
+    lr: 0.0001
     step_size: 10
-    gamma: 0.1
+    gamma: 0.5
+    stage_two: 20
     epoch: 60
     scheduler: [20, 40]
     momentum: 0.9

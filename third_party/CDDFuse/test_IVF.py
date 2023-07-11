@@ -12,8 +12,9 @@ logging.basicConfig(level=logging.CRITICAL)
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 #ckpt_path=r"models/CDDFuse_IVF.pth"
-ckpt_path=r"models_channel64/CDDFuse_07-10-23-05.pth"
-model_dim=64
+#ckpt_path=r"models_channel64/CDDFuse_07-10-23-05.pth"
+ckpt_path=r"models_channel16/CDDFuse_07-10-23-07.pth"
+model_dim=16
 #for dataset_name in ["TNO","RoadScene"]:
 for dataset_name in ["MSRS_test"]:
     print("\n"*2+"="*80)
