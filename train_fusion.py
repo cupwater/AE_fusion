@@ -67,8 +67,14 @@ def main(config_file, is_eval):
         model = model.cuda()
     model = torch.nn.DataParallel(model)
 
-    torch.backends.cudnn.benchmark = True
+    if is_eval:
+        model.load_state_dict(torch.load(os.path.join(
+            common_config['save_path'], 'checkpoint.pth.tar'))['state_dict'], strict=True)
+        print(test(testloader, model, common_config['save_path'], use_cuda))
+        return
 
+
+    torch.backends.cudnn.benchmark = True
     # get all the loss functions into criterion_list
     # optimizer and scheduler
     criterion_dict = {}
@@ -80,8 +86,17 @@ def main(config_file, is_eval):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=common_config['lr'], \
                                   weight_decay=common_config['weight_decay'])
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, \
-                     step_size=common_config['step_size'], gamma=common_config['gamma'])
+    optimizer_encoder = torch.optim.Adam(model.encoder.parameters(), lr=common_config['lr'], \
+                                  weight_decay=common_config['weight_decay'])
+    optimizer_decoder = torch.optim.Adam(model.decoder.parameters(), lr=common_config['lr'], \
+                                  weight_decay=common_config['weight_decay'])
+    optimizer_basefuse = torch.optim.Adam(model.base_fuse.parameters(), lr=common_config['lr'], \
+                                  weight_decay=common_config['weight_decay'])
+    optimizer_detailfuse = torch.optim.Adam(model.detail_fuse.parameters(), lr=common_config['lr'], \
+                                  weight_decay=common_config['weight_decay'])
+    optimizers_list = [optimizer_encoder, optimizer_decoder, optimizer_basefuse, optimizer_detailfuse]
+    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, \
+    #                  step_size=common_config['step_size'], gamma=common_config['gamma'])
     # optimizer = torch.optim.SGD(
     #     filter(
     #         lambda p: p.requires_grad,
@@ -89,12 +104,6 @@ def main(config_file, is_eval):
     #     lr=common_config['lr'],
     #     momentum=0.9,
     #     weight_decay=common_config['weight_decay'])
-
-    if is_eval:
-        model.load_state_dict(torch.load(os.path.join(
-            common_config['save_path'], 'checkpoint.pth.tar'))['state_dict'], strict=True)
-        print(test(testloader, model, common_config['save_path'], use_cuda))
-        return
 
     # logger
     logger = Logger(os.path.join(common_config['save_path'], 'log.txt'))
@@ -104,8 +113,7 @@ def main(config_file, is_eval):
 
     # Train and val
     for epoch in range(common_config['epoch']):
-        #adjust_learning_rate(optimizer, epoch, common_config)
-
+        adjust_learning_rate(optimizers_list, epoch, common_config)
         # start to Stage-II training
         if epoch == common_config['stage_two'] and 'fusion' in criterion_dict.keys():
             criterion_dict['fusion'][1] = 1
@@ -116,7 +124,7 @@ def main(config_file, is_eval):
         print('\nEpoch: [%d | %d] LR: %f' %
               (epoch + 1, common_config['epoch'], state['lr']))
         decomp, fusion, vis_rec, ir_rec, vis_gradient, loss = \
-                            train(trainloader, model, criterion_dict, optimizer, \
+                            train(trainloader, model, criterion_dict, optimizers_list, \
                                   use_cuda, epoch, common_config['print_interval'])
 
         result_metric = np.zeros((8))
@@ -136,7 +144,7 @@ def main(config_file, is_eval):
     logger.close()
 
 
-def train(trainloader, model, criterion_dict, optimizer, use_cuda, epoch, print_interval=100):
+def train(trainloader, model, criterion_dict, optimizers_list, use_cuda, epoch, print_interval=100):
     # switch to train mode
     model.train()
 
@@ -153,6 +161,9 @@ def train(trainloader, model, criterion_dict, optimizer, use_cuda, epoch, print_
     fusion = AverageMeter()
 
     end = time.time()
+
+    optimizer_encoder, optimizer_decoder, optimizer_basefuse, \
+                optimizer_detailfuse = optimizers_list
 
     model.train()
     for batch_idx, (vis_input, ir_input) in enumerate(trainloader):
@@ -194,10 +205,13 @@ def train(trainloader, model, criterion_dict, optimizer, use_cuda, epoch, print_
 
         losses.update(all_loss.item(), vis_input.size(0))
         # compute gradient and do SGD step
-        optimizer.zero_grad()
+        for optimizer in optimizers_list:
+            optimizer.zero_grad()
+
         all_loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.01, norm_type=2)
-        optimizer.step()
+        for optimizer in optimizers_list:
+            optimizer.step()
 
         if batch_idx % print_interval == 0:
             print("iter/epoch: %d / %d \t decomp: %.3f \t fusion: %.3f, \
@@ -276,12 +290,13 @@ def save_checkpoint(state, is_best, save_path, filename='checkpoint.pth.tar'):
             save_path, 'model_best.pth.tar'))
 
 
-def adjust_learning_rate(optimizer, epoch, config):
+def adjust_learning_rate(optimizers_list, epoch, config):
     global state
     if epoch in config['scheduler']:
         state['lr'] *= config['gamma']
-        for param_group in optimizer.param_groups:
-            param_group['lr'] = state['lr']
+        for optimizer in optimizers_list:
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = state['lr']
 
 
 if __name__ == '__main__':

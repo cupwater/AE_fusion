@@ -210,23 +210,23 @@ for epoch in range(num_epochs):
         decomp.update(loss_decomp.item())
         losses.update(loss.item(), data_VIS.size(0))
 
-        # Determine approximate time left
-        batches_done = epoch * len(loader['train']) + i
-        batches_left = num_epochs * len(loader['train']) - batches_done
-        time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
-        prev_time = time.time()
+        # # Determine approximate time left
+        # batches_done = epoch * len(loader['train']) + i
+        # batches_left = num_epochs * len(loader['train']) - batches_done
+        # time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
+        # prev_time = time.time()
 
-        sys.stdout.write(
-            "\r[Epoch %d/%d] [Batch %d/%d] [loss: %f] ETA: %.10s"
-            % (
-                epoch,
-                num_epochs,
-                i,
-                len(loader['train']),
-                loss.item(),
-                time_left,
-            )
-        )
+        # sys.stdout.write(
+        #     "\r[Epoch %d/%d] [Batch %d/%d] [loss: %f] ETA: %.10s"
+        #     % (
+        #         epoch,
+        #         num_epochs,
+        #         i,
+        #         len(loader['train']),
+        #         loss.item(),
+        #         time_left,
+        #     )
+        # )
 
     # adjust the learning rate
     scheduler1.step()  
