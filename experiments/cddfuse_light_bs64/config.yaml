@@ -9,7 +9,7 @@ common:
     gamma: 0.5
     stage_two: 20
     epoch: 60
-    scheduler: [20, 40]
+    scheduler: [10, 20, 30, 40, 50]
     momentum: 0.9
     weight_decay: 0.00
     nesterov: True

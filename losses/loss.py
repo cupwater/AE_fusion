@@ -2,7 +2,7 @@
 '''
 Author: Pengbo
 Date: 2022-02-23 16:17:31
-LastEditTime: 2023-07-10 16:13:23
+LastEditTime: 2023-07-11 16:36:13
 Description: loss function
 
 '''
@@ -204,9 +204,9 @@ class DeCompositionLoss(nn.Module):
         cc = torch.clamp(cc, -1., 1.)
         return cc.mean()
 
-    def forward(self, vis_base_feat, vis_base_detail, ir_base_feat, ir_detail_feat):
+    def forward(self, vis_base_feat, vis_detail_detail, ir_base_feat, ir_detail_feat):
         cc_loss_B = self.cc(vis_base_feat, ir_base_feat)
-        cc_loss_D = self.cc(vis_base_detail, ir_detail_feat)
+        cc_loss_D = self.cc(vis_detail_detail, ir_detail_feat)
         loss_decomp = (cc_loss_D) ** 2 / (1.01 + cc_loss_B)
         return loss_decomp
 

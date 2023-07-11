@@ -120,10 +120,11 @@ class AverageMeter(object):
 logger = Logger(os.path.join(f"models_channel{model_dim}", 'log.txt'))
 logger.set_names(['decomp', 'fusion', 'vis_rec', 'ir_rec', 'vis_gradient', 'loss'])
 
-DIDF_Encoder.train()
-DIDF_Decoder.train()
-BaseFuseLayer.train()
-DetailFuseLayer.train()
+model.train()
+# DIDF_Encoder.train()
+# DIDF_Decoder.train()
+# BaseFuseLayer.train()
+# DetailFuseLayer.train()
 
 for epoch in range(num_epochs):
 
