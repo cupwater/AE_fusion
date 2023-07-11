@@ -84,15 +84,15 @@ def main(config_file, is_eval):
             criterion = criterion.cuda()
         criterion_dict[loss_key] =  [criterion, loss_dict['weight']]
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=common_config['lr'], \
+    #optimizer = torch.optim.Adam(model.parameters(), lr=common_config['lr'], \
+    #                              weight_decay=common_config['weight_decay'])
+    optimizer_encoder = torch.optim.Adam(model.module.encoder.parameters(), lr=common_config['lr'], \
                                   weight_decay=common_config['weight_decay'])
-    optimizer_encoder = torch.optim.Adam(model.encoder.parameters(), lr=common_config['lr'], \
+    optimizer_decoder = torch.optim.Adam(model.module.decoder.parameters(), lr=common_config['lr'], \
                                   weight_decay=common_config['weight_decay'])
-    optimizer_decoder = torch.optim.Adam(model.decoder.parameters(), lr=common_config['lr'], \
+    optimizer_basefuse = torch.optim.Adam(model.module.base_fuse.parameters(), lr=common_config['lr'], \
                                   weight_decay=common_config['weight_decay'])
-    optimizer_basefuse = torch.optim.Adam(model.base_fuse.parameters(), lr=common_config['lr'], \
-                                  weight_decay=common_config['weight_decay'])
-    optimizer_detailfuse = torch.optim.Adam(model.detail_fuse.parameters(), lr=common_config['lr'], \
+    optimizer_detailfuse = torch.optim.Adam(model.module.detail_fuse.parameters(), lr=common_config['lr'], \
                                   weight_decay=common_config['weight_decay'])
     optimizers_list = [optimizer_encoder, optimizer_decoder, optimizer_basefuse, optimizer_detailfuse]
     # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, \
@@ -137,8 +137,6 @@ def main(config_file, is_eval):
             'state_dict': model.state_dict(),
         }, loss < best_loss, save_path=common_config['save_path'])
 
-        scheduler.step()
-
     result_metric = test(testloader, model, common_config['save_path'], use_cuda)
     print(result_metric)
     logger.close()
@@ -161,9 +159,6 @@ def train(trainloader, model, criterion_dict, optimizers_list, use_cuda, epoch, 
     fusion = AverageMeter()
 
     end = time.time()
-
-    optimizer_encoder, optimizer_decoder, optimizer_basefuse, \
-                optimizer_detailfuse = optimizers_list
 
     model.train()
     for batch_idx, (vis_input, ir_input) in enumerate(trainloader):
@@ -268,18 +263,6 @@ def test(testloader, model, save_path, use_cuda):
         end = time.time()
 
     metric_result /= len(testloader)
-    #print("EN\t SD\t SF\t MI\tSCD\tVIF\tQabf\tSSIM")
-    #print(str(np.round(metric_result[0], 2))+'\t'
-    #        +str(np.round(metric_result[1], 2))+'\t'
-    #        +str(np.round(metric_result[2], 2))+'\t'
-    #        +str(np.round(metric_result[3], 2))+'\t'
-    #        +str(np.round(metric_result[4], 2))+'\t'
-    #        +str(np.round(metric_result[5], 2))+'\t'
-    #        +str(np.round(metric_result[6], 2))+'\t'
-    #        +str(np.round(metric_result[7], 2))
-    #        )
-    #print("="*80)
-    #return (losses.avg)
     return np.round(metric_result, 3)
 
 def save_checkpoint(state, is_best, save_path, filename='checkpoint.pth.tar'):
