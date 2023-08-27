@@ -1,17 +1,18 @@
 
 import torch
 import numpy as np
-import os
-import cv2
+import h5py
 from torch.utils.data import Dataset
 from augmentation.transform import MirrorTransform, SpatialTransform
 
 
-__all__ = ['NonalignedVisibleInfraredPairDataset']
+__all__ = ['NonalignedVisibleInfraredPairH5Dataset']
 
-class NonalignedVisibleInfraredPairDataset(Dataset):
-    def __init__(self, imgs_list, transform, prefix='data/', is_aug=True):
-        # self.transform = transform
+class NonalignedVisibleInfraredPairH5Dataset(Dataset):
+    def __init__(self, h5file_path, transform, prefix='data/', is_aug=True):
+        self.h5file_path = h5file_path
+        self.transform = transform
+
         # data augmentation
         self.mirror_aug = MirrorTransform()
         self.spatial_aug = SpatialTransform(do_rotation=True,
@@ -21,26 +22,27 @@ class NonalignedVisibleInfraredPairDataset(Dataset):
                                             do_scale=True,
                                             scale=(0.75, 1.25))
 
+        self.data_list = self._read_all_data_()
         self.is_aug = is_aug
-        self.imgs_list = [l.strip() for l in open(imgs_list).readlines()]
 
+    def _read_all_data_(self):
+        h5f = h5py.File(self.h5file_path, 'r')
+        self.keys = list(h5f['ir_patchs'].keys())
+        data_list = []
+        for idx in range(self.__len__()):
+            key = self.keys[idx]
+            ir = np.array(h5f['ir_patchs'][key])
+            vis = np.array(h5f['vis_patchs'][key])
+            data_list.append((vis, ir))
+        h5f.close()
+        return data_list
+
+    def __len__(self):
+        return len(self.keys)
+    
     def __getitem__(self, index):
-        p1, p2 = self.imgs_list[index].strip().split(',')
-        rgb_path, ir_path = os.path.join(self.prefix, p1.strip()), os.path.join(self.prefix, p2.strip())
-
-        rgb = cv2.imread(rgb_path)
-        ir  = cv2.imread(ir_path, cv2.IMREAD_GRAYSCALE)
-        if self.transform != None:
-            result = self.transform(image=rgb, mask=ir)
-            rgb, ir = result['image'], result['mask']
-        rgb = rgb.transpose((2,0,1))
-        ir  = np.tile(np.expand_dims(ir, axis=2), (1,1,3))
-        ir  = ir.transpose((2,0,1))
-        rgb, ir = torch.FloatTensor(rgb), torch.FloatTensor(ir)
-
-        fix_img, mov_img = rgb / 255.0, ir / 255.0
+        fix_img, mov_img = self.data_list[index]
         fix_lab, mov_lab = None, None
-
         # augmentation
         if self.is_aug:
             code_mir = self.mirror_aug.rand_code()
