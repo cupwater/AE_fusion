@@ -46,13 +46,9 @@ def main(config_file, is_eval):
     
     print('==> Preparing dataset %s' % data_config['train_type'])
     # create dataset for training and testing
-    testset = dataset.__dict__[data_config['test_type']](
-        data_config['test_list'], transform_test,
-        prefix=data_config['prefix'])
     trainset = dataset.__dict__[data_config['train_type']](
         data_config['train_list'], transform_train,
         prefix=data_config['prefix'])
-
     # create dataloader for training and testing
     trainloader = torch.utils.data.DataLoader(
         trainset, batch_size=common_config['train_batch'], shuffle=True, num_workers=16)
@@ -165,7 +161,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     # model related, including  Architecture, path, datasets
     parser.add_argument('--config-file', type=str,
-                        default='experiments/template/config.yaml')
+                        default='experiments/xmorpher_MSRS_fusion/config.yaml')
     parser.add_argument('--eval', action='store_true')
     args = parser.parse_args()
     main(args.config_file, args.eval)

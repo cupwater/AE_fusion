@@ -11,14 +11,19 @@ from torch import nn
 from torch.nn import functional as F
 import kornia
 
+import numpy as np
+import math
+
 import pdb
 from utils.utils import low_pass, gradient
 
 
 __all__ = ['L1Loss',
            'L2Loss',
+           'NCCLoss',
            'MS_SSIMLoss',
            'GradientL1Loss',
+           'Gradient3DLoss',
            'GradientL2Loss',
            'AdaptiveGradientL2Loss',
            'BCELoss',
@@ -45,6 +50,57 @@ class L2Loss(nn.Module):
 
     def forward(self, input, target):
         return F.mse_loss(input, target, reduction=self.reduction)
+
+
+class NCCLoss(nn.Module):
+    def __init__(self):
+        super(NCCLoss, self).__init__()
+
+
+    def compute_local_sums(self, I, J, filt, stride, padding, win):
+        I2 = I * I
+        J2 = J * J
+        IJ = I * J
+
+        I_sum = F.conv3d(I, filt, stride=stride, padding=padding)
+        J_sum = F.conv3d(J, filt, stride=stride, padding=padding)
+        I2_sum = F.conv3d(I2, filt, stride=stride, padding=padding)
+        J2_sum = F.conv3d(J2, filt, stride=stride, padding=padding)
+        IJ_sum = F.conv3d(IJ, filt, stride=stride, padding=padding)
+
+        win_size = int(np.prod(win))
+        u_I = I_sum / win_size
+        u_J = J_sum / win_size
+
+        cross = IJ_sum - u_J * I_sum - u_I * J_sum + u_I * u_J * win_size
+        I_var = I2_sum - 2 * u_I * I_sum + u_I * u_I * win_size
+        J_var = J2_sum - 2 * u_J * J_sum + u_J * u_J * win_size
+
+        return I_var, J_var, cross
+
+    def forward(self, I, J, win=None):
+        ndims = len(list(I.size())) - 2
+        assert ndims in [1, 2, 3], "volumes should be 1 to 3 dimensions. found: %d" % ndims
+
+        if win is None:
+            win = [9] * ndims
+
+        sum_filt = torch.ones([1, 1, *win]).to("cuda")
+        pad_no = math.floor(win[0]/2)
+
+        if ndims == 1:
+            stride = (1)
+            padding = (pad_no)
+        elif ndims == 2:
+            stride = (1,1)
+            padding = (pad_no, pad_no)
+        else:
+            stride = (1,1,1)
+            padding = (pad_no, pad_no, pad_no)
+
+        I_var, J_var, cross = self.compute_local_sums(I, J, sum_filt, stride, padding, win)
+        cc = cross*cross / (I_var*J_var + 1e-5)
+        return 1 - torch.mean(cc)
 
 
 class BCELoss(nn.Module):
@@ -139,6 +195,22 @@ class MS_SSIMLoss(nn.Module):
     def forward(self, img1, img2):
         return 5*self.ssim(img1, img2) + self.mse(img1, img2)
 
+
+class Gradient3DLoss(nn.Module):
+    def __init__(self, penalty='l2'):
+        super(Gradient3DLoss, self).__init__()
+        self.penalty=penalty
+
+    def forward(self, s):
+        dy = torch.abs(s[:, :, 1:, :, :] - s[:, :, :-1, :, :]) 
+        dx = torch.abs(s[:, :, :, 1:, :] - s[:, :, :, :-1, :]) 
+        dz = torch.abs(s[:, :, :, :, 1:] - s[:, :, :, :, :-1]) 
+        if(self.penalty == 'l2'):
+            dy = dy * dy
+            dx = dx * dx
+            dz = dz * dz
+        d = torch.mean(dx) + torch.mean(dy) + torch.mean(dz)
+        return d / 3.0
 
 class GradientL1Loss(nn.Module):
     def __init__(self):
