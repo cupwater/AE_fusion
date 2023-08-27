@@ -11,3 +11,4 @@ from .dehaze_dataset import *
 from .YCrCb_infrared_dataset import *
 from .visible_infrared_h5dataset import *
 from .visible_infrared_test_dataset import *
+from .nonaligned_vis_ir_dataset import *

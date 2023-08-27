@@ -13,3 +13,4 @@ from .fusion.coa_model import COALight, COALarge
 from .fusion.cddfuse import CDDFuseLight, CDDFuseLarge
 #from .DMPHN_dehaze import DMPHN_Dehaze
 from .dehaze.aod_net import AODnet, LightAODnet, TinyAODnet, XLTinyAODnet
+from .fusion.xmorpher import XMorpherFusion
